@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { Shirt, Eye, EyeOff } from 'lucide-react'
 import { authService } from '../services/auth'
 import { Button } from '../components/ui/button'
@@ -13,6 +13,7 @@ export function Login() {
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const navigate = useNavigate()
+  const location = useLocation()
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -20,7 +21,8 @@ export function Login() {
     setLoading(true)
     try {
       await authService.login(email, password)
-      navigate('/dashboard')
+      const from = location.state?.from || '/dashboard'
+      navigate(from, { replace: true })
     } catch (err) {
       setError(err.message === 'Invalid login credentials' ? 'Email ou senha inválidos' : err.message)
     } finally {

@@ -57,7 +57,7 @@ export function Layout() {
     )
   }
 
-  if (!authenticated) return <Navigate to="/login" replace />
+  if (!authenticated) return <Navigate to="/login" state={{ from: location.pathname + location.search }} replace />
 
   return (
     <div className="flex min-h-screen bg-bg-main">
