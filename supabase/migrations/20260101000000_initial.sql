@@ -294,7 +294,6 @@ CREATE TRIGGER on_auth_user_created
 -- ============================================================
 -- SEED: Default production stages (run after creating a company)
 -- ============================================================
--- After creating a company, run:
 -- INSERT INTO production_stages (company_id, name, position) VALUES
 --   ('COMPANY_UUID', 'Desenho', 1),
 --   ('COMPANY_UUID', 'Impressão', 2),
