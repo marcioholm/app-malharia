@@ -114,7 +114,7 @@ export function Dashboard() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-text-primary group-hover:text-primary transition-colors">
-                          #{order.order_number} - {order.clients?.name || 'Sem cliente'}
+                          {order.order_number} - {order.clients?.name || 'Sem cliente'}
                         </p>
                         <p className="text-xs text-text-muted mt-1">
                           {order.products?.name || 'Sem produto'} • {order.quantity} un

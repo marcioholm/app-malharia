@@ -13,7 +13,7 @@ function KanbanCard({ order, onAdvance, isAdvancing }) {
   return (
     <div className="rounded-xl border border-border bg-card-bg p-4 shadow-sm hover:shadow-md hover:border-primary/20 transition-all duration-200 group">
       <div className="flex items-center justify-between mb-3">
-        <span className="text-sm font-bold text-text-primary">#{order.order_number}</span>
+        <span className="text-sm font-bold text-text-primary">{order.order_number}</span>
         <PriorityBadge priority={order.priority} />
       </div>
 
