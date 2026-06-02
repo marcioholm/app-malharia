@@ -5,6 +5,7 @@ import { Button } from '../components/ui/button'
 import { StatusBadge } from '../components/ui/status-badge'
 import { formatDate, statusLabels, priorityLabels } from '../lib/utils'
 import { ordersService } from '../services/orders'
+import { companyService } from '../services/company'
 
 const stageNames = ['Desenho', 'Impressão', 'Calandra', 'Corte', 'Costura', 'Acabamento', 'Finalizado']
 
@@ -30,11 +31,15 @@ function PrintOS() {
   const navigate = useNavigate()
   const printRef = useRef(null)
   const [order, setOrder] = useState(null)
+  const [company, setCompany] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    ordersService.getById(id)
-      .then(setOrder)
+    Promise.all([
+      ordersService.getById(id),
+      companyService.getSettings(),
+    ])
+      .then(([o, c]) => { setOrder(o); setCompany(c) })
       .catch(console.error)
       .finally(() => setLoading(false))
   }, [id])
@@ -211,8 +216,19 @@ function PrintOS() {
           {/* === HEADER === */}
           <div className="flex justify-between items-start mb-6 pb-4 border-b-2 border-gray-900">
             <div>
-              <div className="text-2xl font-bold text-gray-900 mb-1">LOGO DA CONFECÇÃO</div>
-              <div className="text-xs text-gray-500">Empresa de Confecção Ltda</div>
+          {company?.logo_url ? (
+            <img src={company.logo_url} alt="Logo" className="h-16 object-contain mb-1" />
+          ) : (
+            <div className="flex items-center gap-3 mb-1">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
+                <span className="text-xl font-bold text-white">C</span>
+              </div>
+              <div>
+                <div className="text-lg font-bold text-gray-900">{company?.trade_name || company?.company_name || 'CONFECÇÃO'}</div>
+              </div>
+            </div>
+          )}
+          <div className="text-xs text-gray-500">{company?.company_name || ''}</div>
             </div>
             <div className="text-right">
               <div className="text-xl font-bold text-gray-900">{order.order_number}</div>
@@ -389,18 +405,20 @@ function PrintOS() {
           {/* === QR CODE + ASSINATURAS === */}
           <div className="flex items-end justify-between mt-8 pt-4 border-t border-gray-300">
             <div className="flex gap-8">
-              <div className="text-center">
-                <div className="text-xs text-gray-500 mb-1">Responsável Comercial</div>
-                <div className="w-40 border-t border-gray-400 pt-1 mt-2" />
-              </div>
-              <div className="text-center">
-                <div className="text-xs text-gray-500 mb-1">Responsável Produção</div>
-                <div className="w-40 border-t border-gray-400 pt-1 mt-2" />
-              </div>
-              <div className="text-center">
-                <div className="text-xs text-gray-500 mb-1">Cliente</div>
-                <div className="w-40 border-t border-gray-400 pt-1 mt-2" />
-              </div>
+          <div className="text-center">
+            <div className="text-xs text-gray-500 mb-1">Responsável</div>
+            <div className="text-xs font-medium text-gray-700 mb-1">{company?.responsible_name || '________________________'}</div>
+            <div className="text-xs text-gray-500">{company?.responsible_position || ''}</div>
+            <div className="w-40 border-t border-gray-400 pt-1 mt-2" />
+          </div>
+          <div className="text-center">
+            <div className="text-xs text-gray-500 mb-1">Responsável Produção</div>
+            <div className="w-40 border-t border-gray-400 pt-1 mt-2" />
+          </div>
+          <div className="text-center">
+            <div className="text-xs text-gray-500 mb-1">Cliente</div>
+            <div className="w-40 border-t border-gray-400 pt-1 mt-2" />
+          </div>
             </div>
             <div className="text-center">
               <QRCodeSVG url={orderUrl} />

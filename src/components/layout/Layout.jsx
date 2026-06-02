@@ -13,6 +13,7 @@ const pageTitles = {
   '/products': 'Produtos',
   '/reports': 'Relatórios',
   '/settings': 'Configurações',
+  '/settings/company': 'Minha Empresa',
 }
 
 export function Layout() {

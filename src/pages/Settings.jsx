@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Building2, User, Settings as SettingsIcon, ChevronRight } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card'
 import { supabase } from '../lib/supabase'
 
 export function Settings() {
   const [profile, setProfile] = useState(null)
+  const navigate = useNavigate()
 
   useEffect(() => {
     const load = async () => {
@@ -28,27 +31,31 @@ export function Settings() {
       </div>
 
       <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Empresa</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {profile?.companies ? (
-              <div className="space-y-3 text-sm">
-                <div>
-                  <p className="text-text-muted">Nome</p>
-                  <p className="font-medium text-text-primary">{profile.companies.name}</p>
-                </div>
+        <button
+          onClick={() => navigate('/settings/company')}
+          className="text-left rounded-2xl border border-border bg-card-bg p-6 shadow-sm hover:shadow-md hover:border-primary/30 transition-all duration-200 cursor-pointer group"
+        >
+          <div className="flex items-start justify-between">
+            <div className="space-y-1">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary-bg mb-3">
+                <Building2 size={24} className="text-primary" />
               </div>
-            ) : (
-              <p className="text-sm text-text-muted">Nenhuma empresa vinculada</p>
-            )}
-          </CardContent>
-        </Card>
+              <h3 className="text-base font-semibold text-text-primary group-hover:text-primary transition-colors">Minha Empresa</h3>
+              <p className="text-sm text-text-muted">Dados institucionais, logo, endereço e contato</p>
+            </div>
+            <ChevronRight size={18} className="text-text-muted group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
+          </div>
+          {profile?.companies && (
+            <p className="text-xs text-text-muted mt-4 pt-4 border-t border-border-light">{profile.companies.name}</p>
+          )}
+        </button>
 
         <Card>
           <CardHeader>
-            <CardTitle>Usuário</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <User size={16} className="text-primary" />
+              Meu Perfil
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {profile ? (

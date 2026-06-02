@@ -12,6 +12,7 @@ import PrintOS from './pages/PrintOS'
 import { Kanban } from './pages/Kanban'
 import { Reports } from './pages/Reports'
 import { Settings } from './pages/Settings'
+import { CompanySettings } from './pages/CompanySettings'
 
 export default function App() {
   return (
@@ -43,6 +44,7 @@ export default function App() {
           <Route path="/kanban" element={<Kanban />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/settings/company" element={<CompanySettings />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
