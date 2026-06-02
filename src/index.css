@@ -1,5 +1,16 @@
 @import "tailwindcss";
 
+@layer base {
+  body {
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  #root {
+    min-height: 100vh;
+  }
+}
+
 @theme {
   --color-primary: #16a34a;
   --color-primary-dark: #15803d;

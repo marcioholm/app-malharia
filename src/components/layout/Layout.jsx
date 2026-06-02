@@ -9,16 +9,21 @@ export function Layout() {
   const [authenticated, setAuthenticated] = useState(false)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        setAuthenticated(!!session)
+        setLoading(false)
+      })
+      .catch((err) => {
+        console.error('Erro ao verificar sessão:', err)
+        setLoading(false)
+      })
+
+    const { data: authData } = supabase.auth.onAuthStateChange((_event, session) => {
       setAuthenticated(!!session)
-      setLoading(false)
     })
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setAuthenticated(!!session)
-    })
-
-    return () => subscription.unsubscribe()
+    return () => authData?.subscription?.unsubscribe()
   }, [])
 
   if (loading) {

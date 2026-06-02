@@ -73,7 +73,7 @@ export function Kanban() {
   const stageColors = {
     'Desenho': 'border-t-blue-500',
     'Impressão': 'border-t-purple-500',
-    'Calandra': 't-orange-500',
+    'Calandra': 'border-t-orange-500',
     'Corte': 'border-t-yellow-500',
     'Costura': 'border-t-pink-500',
     'Acabamento': 'border-t-teal-500',
