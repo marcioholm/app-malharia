@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Plus, Search, Edit2, Trash2, Package } from 'lucide-react'
+import toast from 'react-hot-toast'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card'
@@ -35,15 +36,21 @@ export function Products() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
-      editingProduct ? await productsService.update(editingProduct.id, form) : await productsService.create(form)
+      if (editingProduct) {
+        await productsService.update(editingProduct.id, form)
+        toast.success('Produto atualizado!')
+      } else {
+        await productsService.create(form)
+        toast.success('Produto criado!')
+      }
       setModalOpen(false); loadProducts()
-    } catch (err) { console.error(err) }
+    } catch (err) { toast.error(`Erro: ${err.message}`) }
   }
 
   const handleDelete = async (id) => {
-    if (!confirm('Tem certeza?')) return
-    try { await productsService.delete(id); loadProducts() }
-    catch (err) { console.error(err) }
+    if (!confirm('Tem certeza que deseja excluir este produto?')) return
+    try { await productsService.delete(id); toast.success('Produto excluído'); loadProducts() }
+    catch (err) { toast.error(`Erro: ${err.message}`) }
   }
 
   return (

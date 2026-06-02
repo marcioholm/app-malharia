@@ -15,7 +15,7 @@ export const productionService = {
         .from('production_orders')
         .select('*, clients(name), products(name), production_order_stages(*, production_stages(*))')
         .eq('current_stage', stage.name)
-        .in('status', ['aberta', 'em_producao', 'pausada'])
+        .in('status', ['aberta', 'em_producao', 'pausada', 'finalizada', 'entregue'])
         .order('priority', { ascending: false })
 
       result.push({
@@ -23,17 +23,6 @@ export const productionService = {
         orders: orders || [],
       })
     }
-
-    const { data: finishedOrders } = await supabase
-      .from('production_orders')
-      .select('*, clients(name), products(name), production_order_stages(*, production_stages(*))')
-      .in('status', ['finalizada', 'entregue'])
-      .order('updated_at', { ascending: false })
-
-    result.push({
-      stage: { id: 'finalized', name: 'Finalizado', position: 99 },
-      orders: finishedOrders || [],
-    })
 
     return result
   },

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Plus, Search, Edit2, Trash2, Users as UsersIcon } from 'lucide-react'
+import toast from 'react-hot-toast'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card'
@@ -33,15 +34,21 @@ export function Clients() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
-      editingClient ? await clientsService.update(editingClient.id, form) : await clientsService.create(form)
+      if (editingClient) {
+        await clientsService.update(editingClient.id, form)
+        toast.success('Cliente atualizado!')
+      } else {
+        await clientsService.create(form)
+        toast.success('Cliente criado!')
+      }
       setModalOpen(false); loadClients()
-    } catch (err) { console.error(err) }
+    } catch (err) { toast.error(`Erro: ${err.message}`) }
   }
 
   const handleDelete = async (id) => {
-    if (!confirm('Tem certeza?')) return
-    try { await clientsService.delete(id); loadClients() }
-    catch (err) { console.error(err) }
+    if (!confirm('Tem certeza que deseja excluir este cliente?')) return
+    try { await clientsService.delete(id); toast.success('Cliente excluído'); loadClients() }
+    catch (err) { toast.error(`Erro: ${err.message}`) }
   }
 
   return (

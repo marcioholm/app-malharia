@@ -1,35 +1,43 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FileText, PlayCircle, CheckCircle2, AlertCircle, TrendingUp, Plus } from 'lucide-react'
+import { FileText, PlayCircle, CheckCircle2, AlertCircle, TrendingUp, DollarSign, Plus, Clock, ExternalLink } from 'lucide-react'
+import toast from 'react-hot-toast'
 import { MetricCard } from '../components/ui/metric-card'
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card'
 import { StatusBadge, PriorityBadge } from '../components/ui/status-badge'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
-import { formatDate } from '../lib/utils'
+import { formatDate, getDeadlineStatus, deadlineStyles } from '../lib/utils'
 import { dashboardService } from '../services/dashboard'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts'
 
 export function Dashboard() {
-  const [metrics, setMetrics] = useState({ open: 0, inProduction: 0, finished: 0, delayed: 0 })
+  const [metrics, setMetrics] = useState({ open: 0, inProduction: 0, finished: 0, delayed: 0, monthValue: 0 })
   const [productionByStage, setProductionByStage] = useState([])
   const [latestOrders, setLatestOrders] = useState([])
+  const [upcoming, setUpcoming] = useState([])
+  const [delayed, setDelayed] = useState([])
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [m, p, l] = await Promise.all([
+        const [m, p, l, u, d] = await Promise.all([
           dashboardService.getMetrics(),
           dashboardService.getProductionByStage(),
           dashboardService.getLatestOrders(),
+          dashboardService.getUpcomingDeadlines(),
+          dashboardService.getDelayedOrders(),
         ])
         setMetrics(m)
         setProductionByStage(p)
         setLatestOrders(l)
+        setUpcoming(u)
+        setDelayed(d)
       } catch (err) {
         console.error(err)
+        toast.error('Erro ao carregar dashboard')
       } finally {
         setLoading(false)
       }
@@ -64,10 +72,15 @@ export function Dashboard() {
       </div>
 
       <div className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        <MetricCard title="OS em Produção" value={metrics.inProduction} icon={PlayCircle} trend={12} />
-        <MetricCard title="OS Atrasadas" value={metrics.delayed} icon={AlertCircle} trend={-8} className="border-danger/20" />
-        <MetricCard title="OS Finalizadas" value={metrics.finished} icon={CheckCircle2} trend={24} />
-        <MetricCard title="Produção do Mês" value={metrics.open + metrics.inProduction} icon={TrendingUp} subtitle={`${metrics.finished} concluídas`} />
+        <MetricCard title="OS Abertas" value={metrics.open} icon={FileText} subtitle="Aguardando início" />
+        <MetricCard title="OS em Produção" value={metrics.inProduction} icon={PlayCircle} trend={12} subtitle="Em andamento" />
+        <MetricCard title="OS Atrasadas" value={metrics.delayed} icon={AlertCircle} className="border-danger/20" subtitle="Fora do prazo" />
+        <MetricCard title="OS Finalizadas" value={metrics.finished} icon={CheckCircle2} trend={24} subtitle="Concluídas no total" />
+      </div>
+
+      <div className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        <MetricCard title="Produção do Mês" value={latestOrders.length} icon={TrendingUp} subtitle="OS criadas este mês" />
+        <MetricCard title="Valor em Produção" value={metrics.monthValue} icon={DollarSign} subtitle="Valor total do mês" format="currency" />
       </div>
 
       <div className="grid gap-6 grid-cols-1 lg:grid-cols-7">
@@ -138,8 +151,80 @@ export function Dashboard() {
                     <FileText size={24} className="text-text-muted" />
                   </div>
                   <p className="text-sm text-text-muted">Nenhuma OS criada</p>
+                  <Button variant="outline" size="sm" className="mt-3" onClick={() => navigate('/orders/new')}>
+                    <Plus size={14} /> Criar primeira OS
+                  </Button>
                 </div>
               </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Upcoming and Delayed */}
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock size={16} className="text-warning" />
+              Próximas do Vencimento
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {upcoming.length > 0 ? (
+              <div className="space-y-2">
+                {upcoming.map((order) => (
+                  <button
+                    key={order.id}
+                    onClick={() => navigate(`/orders/${order.id}`)}
+                    className="w-full flex items-center justify-between rounded-xl border border-warning/20 bg-warning-bg/50 p-3 hover:border-warning/40 transition-all cursor-pointer"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-text-primary">{order.order_number}</p>
+                      <p className="text-xs text-text-muted">{order.clients?.name}</p>
+                    </div>
+                    <div className="text-right shrink-0 ml-3">
+                      <p className="text-sm font-medium text-warning">{formatDate(order.delivery_date)}</p>
+                      <p className="text-xs text-text-muted">{order.quantity} un</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-text-muted text-center py-8">Nenhuma OS próxima do prazo</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertCircle size={16} className="text-danger" />
+              OS Atrasadas
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {delayed.length > 0 ? (
+              <div className="space-y-2">
+                {delayed.map((order) => (
+                  <button
+                    key={order.id}
+                    onClick={() => navigate(`/orders/${order.id}`)}
+                    className="w-full flex items-center justify-between rounded-xl border border-danger/20 bg-danger-bg/50 p-3 hover:border-danger/40 transition-all cursor-pointer"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-text-primary">{order.order_number}</p>
+                      <p className="text-xs text-text-muted">{order.clients?.name}</p>
+                    </div>
+                    <div className="text-right shrink-0 ml-3">
+                      <p className="text-sm font-medium text-danger">{formatDate(order.delivery_date)}</p>
+                      <p className="text-xs text-text-muted">{order.current_stage}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-success text-center py-8">Nenhuma OS atrasada! 🎉</p>
             )}
           </CardContent>
         </Card>

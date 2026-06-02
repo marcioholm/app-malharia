@@ -6,7 +6,7 @@ import { StatusBadge } from '../components/ui/status-badge'
 import { formatDate, statusLabels, priorityLabels } from '../lib/utils'
 import { ordersService } from '../services/orders'
 
-const stageNames = ['Desenho', 'Impressão', 'Calandra', 'Corte', 'Costura', 'Acabamento']
+const stageNames = ['Desenho', 'Impressão', 'Calandra', 'Corte', 'Costura', 'Acabamento', 'Finalizado']
 
 function QRCodeSVG({ url }) {
   const [svg, setSvg] = useState('')

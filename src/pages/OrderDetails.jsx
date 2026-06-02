@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, CheckCircle, XCircle, User, Calendar, Hash, Package, Clock, AlertCircle, Printer } from 'lucide-react'
+import {
+  ArrowLeft, CheckCircle, XCircle, User, Calendar, Hash, Package, Clock, AlertCircle,
+  Printer, PauseCircle, PlayCircle, Undo2, Edit3, Save
+} from 'lucide-react'
+import toast from 'react-hot-toast'
 import { Button } from '../components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
@@ -18,6 +22,7 @@ const stageNames = [
   { name: 'Corte' },
   { name: 'Costura' },
   { name: 'Acabamento' },
+  { name: 'Finalizado' },
 ]
 
 export function OrderDetails() {
@@ -26,40 +31,65 @@ export function OrderDetails() {
   const [order, setOrder] = useState(null)
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
+  const [actionLoading, setActionLoading] = useState(null)
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const [o, h] = await Promise.all([
-          ordersService.getById(id),
-          ordersService.getHistory(id),
-        ])
-        setOrder(o)
-        setHistory(h)
-      } catch (err) {
-        console.error(err)
-      } finally {
-        setLoading(false)
-      }
+  const load = async () => {
+    try {
+      const [o, h] = await Promise.all([
+        ordersService.getById(id),
+        ordersService.getHistory(id),
+      ])
+      setOrder(o)
+      setHistory(h)
+    } catch (err) {
+      console.error(err)
+      toast.error('Erro ao carregar OS')
+    } finally {
+      setLoading(false)
     }
-    load()
-  }, [id])
+  }
 
-  const handleFinish = async () => {
+  useEffect(() => { load() }, [id])
+
+  const doAction = async (action, fn, successMsg) => {
+    setActionLoading(action)
+    try {
+      await fn()
+      toast.success(successMsg)
+      await load()
+    } catch (err) {
+      toast.error(`Erro: ${err.message}`)
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleFinish = () => {
     if (!confirm('Finalizar esta OS?')) return
-    await ordersService.finish(id)
-    window.location.reload()
+    doAction('finish', () => ordersService.finish(id), 'OS finalizada com sucesso!')
   }
 
-  const handleCancel = async () => {
-    if (!confirm('Cancelar esta OS?')) return
-    await ordersService.cancel(id)
-    window.location.reload()
+  const handleCancel = () => {
+    if (!confirm('Tem certeza que deseja cancelar esta OS?')) return
+    doAction('cancel', () => ordersService.cancel(id), 'OS cancelada')
   }
 
-  const handleAdvance = async () => {
-    await ordersService.moveToNextStage(id)
-    window.location.reload()
+  const handlePause = () => {
+    if (!confirm('Pausar esta OS?')) return
+    doAction('pause', () => ordersService.pause(id), 'OS pausada')
+  }
+
+  const handleResume = () => {
+    doAction('resume', () => ordersService.resume(id), 'OS retomada!')
+  }
+
+  const handleAdvance = () => {
+    doAction('advance', () => ordersService.moveToNextStage(id), 'Fase avançada!')
+  }
+
+  const handleGoBack = () => {
+    if (!confirm('Voltar para a fase anterior?')) return
+    doAction('goback', () => ordersService.moveToPreviousStage(id), 'Fase revertida!')
   }
 
   if (loading) {
@@ -89,6 +119,12 @@ export function OrderDetails() {
   const orderedStages = [...stages].sort(
     (a, b) => (a.production_stages?.position || 0) - (b.production_stages?.position || 0)
   )
+  const isActive = !['finalizada', 'cancelada', 'entregue'].includes(order.status)
+  const isPaused = order.status === 'pausada'
+
+  const items = order.order_items || []
+  const totalItems = items.reduce((s, i) => s + i.quantity, 0)
+  const totalValue = items.reduce((s, i) => s + Number(i.total_price || 0), 0)
 
   return (
     <div className="space-y-6">
@@ -114,24 +150,61 @@ export function OrderDetails() {
           <Button variant="outline" onClick={() => navigate(`/orders/${order.id}/print`)}>
             <Printer size={16} /> Imprimir OS
           </Button>
-          {order.status !== 'finalizada' && order.status !== 'cancelada' && order.status !== 'entregue' && (
+          {isActive && (
             <>
-              <Button variant="outline" onClick={handleAdvance}>
-                Avancar Fase
-              </Button>
-              <Button onClick={handleFinish}>
-                <CheckCircle size={16} /> Finalizar
-              </Button>
-              <Button variant="destructive" onClick={handleCancel}>
-                <XCircle size={16} /> Cancelar
-              </Button>
+              {isPaused ? (
+                <Button
+                  variant="outline"
+                  onClick={handleResume}
+                  disabled={actionLoading === 'resume'}
+                >
+                  <PlayCircle size={16} /> {actionLoading === 'resume' ? 'Retomando...' : 'Retomar'}
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={handleGoBack}
+                    disabled={actionLoading === 'goback'}
+                  >
+                    <Undo2 size={16} /> {actionLoading === 'goback' ? 'Voltando...' : 'Voltar Fase'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleAdvance}
+                    disabled={actionLoading === 'advance'}
+                  >
+                    {actionLoading === 'advance' ? 'Avançando...' : 'Avançar Fase'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handlePause}
+                    disabled={actionLoading === 'pause'}
+                  >
+                    <PauseCircle size={16} /> {actionLoading === 'pause' ? 'Pausando...' : 'Pausar'}
+                  </Button>
+                  <Button
+                    onClick={handleFinish}
+                    disabled={actionLoading === 'finish'}
+                  >
+                    <CheckCircle size={16} /> {actionLoading === 'finish' ? 'Finalizando...' : 'Finalizar'}
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={handleCancel}
+                    disabled={actionLoading === 'cancel'}
+                  >
+                    <XCircle size={16} /> {actionLoading === 'cancel' ? 'Cancelando...' : 'Cancelar'}
+                  </Button>
+                </>
+              )}
             </>
           )}
         </div>
       </div>
 
       <div className="grid gap-6 grid-cols-1 lg:grid-cols-5">
-        {/* Left column - Info + Progress */}
+        {/* Left column */}
         <div className="lg:col-span-3 space-y-6">
           <Card>
             <CardHeader>
@@ -144,21 +217,23 @@ export function OrderDetails() {
                     <User size={16} className="text-text-muted mt-0.5 shrink-0" />
                     <div>
                       <p className="text-xs text-text-muted">Cliente</p>
-                      <p className="text-sm font-medium text-text-primary">{order.clients?.name || '—'}</p>
+                      <p className="text-sm font-medium text-text-primary">{order.clients?.name || '---'}</p>
+                      {order.clients?.phone && <p className="text-xs text-text-muted">{order.clients.phone}</p>}
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
                     <Package size={16} className="text-text-muted mt-0.5 shrink-0" />
                     <div>
                       <p className="text-xs text-text-muted">Produto</p>
-                      <p className="text-sm font-medium text-text-primary">{order.products?.name || '—'}</p>
+                      <p className="text-sm font-medium text-text-primary">{order.products?.name || '---'}</p>
+                      {order.products?.category && <p className="text-xs text-text-muted">{order.products.category}</p>}
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
                     <Hash size={16} className="text-text-muted mt-0.5 shrink-0" />
                     <div>
-                      <p className="text-xs text-text-muted">Quantidade</p>
-                      <p className="text-sm font-medium text-text-primary">{order.quantity} unidades</p>
+                      <p className="text-xs text-text-muted">Quantidade Total</p>
+                      <p className="text-sm font-medium text-text-primary">{totalItems || order.quantity} unidades</p>
                     </div>
                   </div>
                 </div>
@@ -187,6 +262,17 @@ export function OrderDetails() {
                       </div>
                     </div>
                   </div>
+                  <div className="flex items-start gap-3">
+                    <Badge variant="default" className="shrink-0">
+                      R$
+                    </Badge>
+                    <div>
+                      <p className="text-xs text-text-muted">Valor Total</p>
+                      <p className="text-sm font-bold text-text-primary">
+                        {(Number(order.total_price) || totalValue).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
               {order.notes && (
@@ -197,6 +283,57 @@ export function OrderDetails() {
               )}
             </CardContent>
           </Card>
+
+          {/* Items Table */}
+          {items.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Itens da OS</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border text-xs text-text-muted uppercase tracking-wider">
+                        <th className="text-left py-2">Modelo</th>
+                        <th className="text-left py-2">Nome</th>
+                        <th className="text-center py-2">Tam</th>
+                        <th className="text-center py-2">Qtd</th>
+                        <th className="text-right py-2">Valor Unit.</th>
+                        <th className="text-right py-2">Valor Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border-light">
+                      {items.map((item) => (
+                        <tr key={item.id}>
+                          <td className="py-2 text-text-primary">{item.model}</td>
+                          <td className="py-2 text-text-secondary">{item.custom_name || '—'}</td>
+                          <td className="py-2 text-center text-text-secondary">{item.size || '—'}</td>
+                          <td className="py-2 text-center font-medium">{item.quantity}</td>
+                          <td className="py-2 text-right text-text-secondary">
+                            {Number(item.unit_price).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </td>
+                          <td className="py-2 text-right font-medium">
+                            {Number(item.total_price).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t border-border font-bold">
+                        <td colSpan={3} className="py-2 text-text-primary">Total</td>
+                        <td className="py-2 text-center">{totalItems}</td>
+                        <td />
+                        <td className="py-2 text-right">
+                          {totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader>
@@ -236,17 +373,17 @@ export function OrderDetails() {
                               <div className="flex items-center gap-2 text-sm">
                                 <User size={14} className="text-text-muted" />
                                 <span className="text-text-muted">Responsável:</span>
-                                <span className="text-text-primary">—</span>
+                                <span className="text-text-primary">---</span>
                               </div>
                               <div className="flex items-center gap-2 text-sm">
                                 <Calendar size={14} className="text-text-muted" />
                                 <span className="text-text-muted">Início:</span>
-                                <span className="text-text-primary">{stage.started_at ? formatDate(stage.started_at) : '—'}</span>
+                                <span className="text-text-primary">{stage.started_at ? formatDate(stage.started_at) : '---'}</span>
                               </div>
                               <div className="flex items-center gap-2 text-sm">
                                 <CheckCircle size={14} className="text-text-muted" />
                                 <span className="text-text-muted">Conclusão:</span>
-                                <span className="text-text-primary">{stage.completed_at ? formatDate(stage.completed_at) : '—'}</span>
+                                <span className="text-text-primary">{stage.completed_at ? formatDate(stage.completed_at) : '---'}</span>
                               </div>
                               {stage.notes && (
                                 <div className="rounded-lg bg-gray-50 p-3 text-sm text-text-secondary">
@@ -267,7 +404,7 @@ export function OrderDetails() {
           </Card>
         </div>
 
-        {/* Right column - History */}
+        {/* Right column */}
         <div className="lg:col-span-2 space-y-6">
           <Card>
             <CardHeader>
@@ -313,11 +450,11 @@ export function OrderDetails() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Responsáveis</CardTitle>
+              <CardTitle>Responsáveis por Fase</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {orderedStages.slice(0, 4).map((stage) => (
+                {orderedStages.slice(0, 7).map((stage) => (
                   <div key={stage.id} className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className={`h-2 w-2 rounded-full ${
@@ -326,7 +463,7 @@ export function OrderDetails() {
                       }`} />
                       <span className="text-sm text-text-secondary">{stage.production_stages?.name}</span>
                     </div>
-                    <Avatar name="—" size="sm" />
+                    <Avatar name="---" size="sm" />
                   </div>
                 ))}
               </div>
