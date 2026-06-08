@@ -60,7 +60,7 @@ export function Login() {
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat scale-110"
           style={{
-            backgroundImage: `url('https://images.unsplash.com/photo-1558769132-cb1aea458c5e?w=1400&q=85')`,
+            backgroundImage: `url('https://images.unsplash.com/photo-1517466787929-bc90951d0974?w=1400&q=85')`,
             transform: loaded ? 'scale(1)' : 'scale(1.1)',
             transition: 'transform 1.5s cubic-bezier(0.16, 1, 0.3, 1)',
           }}
@@ -81,7 +81,7 @@ export function Login() {
         {/* Hero Content */}
         <div className="relative z-10 flex flex-col justify-center px-16 w-full">
           <div className={`max-w-lg transition-all duration-1000 delay-200 ${loaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-            <div className="flex items-center gap-4 mb-6">
+            <div className="flex items-center gap-4 mb-8">
               {companyLogo ? (
                 <img src={companyLogo} alt="" className="h-14 w-14 object-contain rounded-2xl bg-white/10 backdrop-blur-md p-2 border border-white/10" />
               ) : (
@@ -104,7 +104,7 @@ export function Login() {
               Do desenho ao acabamento, cada fase sob controle.
             </p>
 
-            <div className="mt-10 flex gap-3">
+            <div className="mt-10 flex flex-wrap gap-3">
               {['Controle Total', 'Kanban Visual', 'Sem Atrasos'].map((item, i) => (
                 <div
                   key={item}

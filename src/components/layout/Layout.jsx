@@ -3,6 +3,7 @@ import { Outlet, Navigate, useLocation } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { Sidebar } from './Sidebar'
 import { Header } from './Header'
+import { cn } from '../../lib/utils'
 
 const pageTitles = {
   '/dashboard': 'Dashboard',
@@ -66,13 +67,16 @@ export function Layout() {
         onToggle={() => setCollapsed(!collapsed)}
         mobileOpen={mobileOpen}
         onMobileClose={() => setMobileOpen(false)}
+        onMobileOpen={() => setMobileOpen(true)}
       />
       <div
-        className="flex-1 flex flex-col transition-all duration-300"
-        style={{ marginLeft: collapsed ? '80px' : '240px' }}
+        className={cn(
+          'flex-1 flex flex-col transition-all duration-300',
+          collapsed ? 'lg:ml-20' : 'lg:ml-60'
+        )}
       >
-        <Header title={title} />
-        <main className="flex-1 p-6 lg:p-8">
+        <Header title={title} onMenuClick={() => setMobileOpen(true)} />
+        <main className="flex-1 p-4 lg:p-8 pt-16 lg:pt-8">
           <Outlet />
         </main>
       </div>

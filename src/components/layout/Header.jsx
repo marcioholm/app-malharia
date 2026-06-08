@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Bell, ChevronDown, LogOut, User, Settings, CheckCheck, ExternalLink } from 'lucide-react'
+import { Menu, Bell, ChevronDown, LogOut, User, Settings, CheckCheck } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { Avatar } from '../ui/avatar'
@@ -7,7 +7,7 @@ import { DropdownMenu, DropdownTrigger, DropdownContent, DropdownItem, DropdownS
 import { notificationService } from '../../services/notifications'
 import { formatDate } from '../../lib/utils'
 
-export function Header({ title }) {
+export function Header({ title, onMenuClick }) {
   const [userName, setUserName] = useState('')
   const [notifications, setNotifications] = useState([])
   const [unreadCount, setUnreadCount] = useState(0)
@@ -82,8 +82,15 @@ export function Header({ title }) {
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-card-bg px-6 lg:px-8">
-      <div className="lg:hidden" />
-      <h1 className="text-xl font-bold text-text-primary hidden lg:block">{title || 'Dashboard'}</h1>
+      <div className="flex items-center gap-3">
+        <button
+          onClick={onMenuClick}
+          className="flex h-9 w-9 items-center justify-center rounded-xl hover:bg-gray-100 transition-colors lg:hidden cursor-pointer"
+        >
+          <Menu size={18} className="text-text-secondary" />
+        </button>
+        <h1 className="text-lg lg:text-xl font-bold text-text-primary">{title || 'Dashboard'}</h1>
+      </div>
 
       <div className="flex items-center gap-4">
         {/* Notifications Dropdown */}
