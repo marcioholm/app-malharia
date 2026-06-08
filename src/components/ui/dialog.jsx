@@ -5,7 +5,7 @@ export function Dialog({ open, onOpenChange, children }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => onOpenChange?.(false)} />
-      <div className="relative z-50 w-full max-w-lg mx-4 rounded-2xl border border-border bg-card-bg shadow-2xl">
+      <div className="relative z-50 w-full max-w-lg lg:max-w-xl mx-4 max-h-[85vh] overflow-y-auto rounded-2xl border border-border bg-card-bg shadow-2xl">
         {children}
       </div>
     </div>
