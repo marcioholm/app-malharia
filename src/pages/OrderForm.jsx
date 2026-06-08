@@ -137,7 +137,7 @@ export function OrderForm() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto space-y-6">
       <div className="flex items-center gap-4">
         <button
           onClick={() => navigate('/orders')}
@@ -157,7 +157,7 @@ export function OrderForm() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
               <div className="space-y-2">
                 <Label>Cliente *</Label>
                 <div className="flex gap-2">
