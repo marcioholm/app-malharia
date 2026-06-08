@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Save, CheckCircle2, Plus, Trash2 } from 'lucide-react'
+import { ArrowLeft, Save, CheckCircle2, Plus, Trash2, UserPlus } from 'lucide-react'
+import toast from 'react-hot-toast'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
 import { Select } from '../components/ui/select'
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card'
+import { Dialog, DialogHeader, DialogTitle, DialogContent } from '../components/ui/dialog'
 import { clientsService } from '../services/clients'
 import { productsService } from '../services/products'
 import { ordersService } from '../services/orders'
@@ -18,6 +20,8 @@ export function OrderForm() {
   const [clients, setClients] = useState([])
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(false)
+  const [newClientOpen, setNewClientOpen] = useState(false)
+  const [newClientForm, setNewClientForm] = useState({ name: '', phone: '', whatsapp: '', email: '', city: '' })
   const [form, setForm] = useState({
     client_id: '',
     product_id: '',
@@ -43,6 +47,32 @@ export function OrderForm() {
     }
     load()
   }, [])
+
+  const handleClientChange = (clientId) => {
+    const client = clients.find(c => c.id === clientId)
+    setForm({
+      ...form,
+      client_id: clientId,
+      contact_person: client ? client.name : '',
+      phone: client ? (client.phone || client.whatsapp || '') : '',
+    })
+  }
+
+  const handleCreateClient = async (e) => {
+    e.preventDefault()
+    if (!newClientForm.name) return
+    try {
+      const created = await clientsService.create(newClientForm)
+      const updated = await clientsService.list()
+      setClients(updated)
+      handleClientChange(created.id)
+      setNewClientOpen(false)
+      setNewClientForm({ name: '', phone: '', whatsapp: '', email: '', city: '' })
+      toast.success('Cliente criado!')
+    } catch (err) {
+      toast.error(`Erro ao criar cliente: ${err.message}`)
+    }
+  }
 
   const getNextOrderNumber = async () => {
     const orders = await ordersService.list()
@@ -130,17 +160,22 @@ export function OrderForm() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div className="space-y-2">
                 <Label>Cliente *</Label>
-                <select
-                  className="flex h-10 w-full rounded-xl border border-border bg-white px-4 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                  value={form.client_id}
-                  onChange={(e) => setForm({ ...form, client_id: e.target.value })}
-                  required
-                >
-                  <option value="">Selecione um cliente</option>
-                  {clients.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
+                <div className="flex gap-2">
+                  <select
+                    className="flex h-10 flex-1 rounded-xl border border-border bg-white px-4 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                    value={form.client_id}
+                    onChange={(e) => handleClientChange(e.target.value)}
+                    required
+                  >
+                    <option value="">Selecione um cliente</option>
+                    {clients.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setNewClientOpen(true)} className="shrink-0">
+                    <UserPlus size={16} />
+                  </Button>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label>Produto *</Label>
@@ -311,6 +346,42 @@ export function OrderForm() {
               </Button>
             </div>
           </form>
+
+          <Dialog open={newClientOpen} onOpenChange={setNewClientOpen}>
+            <DialogHeader><DialogTitle>Novo Cliente</DialogTitle></DialogHeader>
+            <DialogContent>
+              <form onSubmit={handleCreateClient} className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Nome *</Label>
+                  <Input value={newClientForm.name} onChange={(e) => setNewClientForm({ ...newClientForm, name: e.target.value })} required />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Telefone</Label>
+                    <Input value={newClientForm.phone} onChange={(e) => setNewClientForm({ ...newClientForm, phone: e.target.value })} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>WhatsApp</Label>
+                    <Input value={newClientForm.whatsapp} onChange={(e) => setNewClientForm({ ...newClientForm, whatsapp: e.target.value })} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Email</Label>
+                    <Input type="email" value={newClientForm.email} onChange={(e) => setNewClientForm({ ...newClientForm, email: e.target.value })} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Cidade</Label>
+                    <Input value={newClientForm.city} onChange={(e) => setNewClientForm({ ...newClientForm, city: e.target.value })} />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-3 pt-2">
+                  <Button type="button" variant="outline" onClick={() => setNewClientOpen(false)}>Cancelar</Button>
+                  <Button type="submit">Criar Cliente</Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
         </CardContent>
       </Card>
     </div>
