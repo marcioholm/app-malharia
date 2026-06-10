@@ -15,6 +15,7 @@ const pageTitles = {
   '/reports': 'Relatórios',
   '/settings': 'Configurações',
   '/settings/company': 'Minha Empresa',
+  '/settings/users': 'Usuários',
 }
 
 export function Layout() {

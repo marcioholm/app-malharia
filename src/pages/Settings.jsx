@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Building2, User, Settings as SettingsIcon, ChevronRight, Shield } from 'lucide-react'
+import { Building2, User, Settings as SettingsIcon, ChevronRight, Shield, Users } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { supabase } from '../lib/supabase'
@@ -44,6 +44,25 @@ export function Settings() {
               </div>
               <h3 className="text-base font-semibold text-text-primary group-hover:text-primary transition-colors">Minha Empresa</h3>
               <p className="text-sm text-text-muted">Dados institucionais, logo, endereço e contato</p>
+            </div>
+            <ChevronRight size={18} className="text-text-muted group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
+          </div>
+          {profile?.companies && (
+            <p className="text-xs text-text-muted mt-4 pt-4 border-t border-border-light">{profile.companies.name}</p>
+          )}
+        </button>
+
+        <button
+          onClick={() => navigate('/settings/users')}
+          className="text-left rounded-2xl border border-border bg-card-bg p-6 shadow-sm hover:shadow-md hover:border-primary/30 transition-all duration-200 cursor-pointer group"
+        >
+          <div className="flex items-start justify-between">
+            <div className="space-y-1">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary-bg mb-3">
+                <Users size={24} className="text-primary" />
+              </div>
+              <h3 className="text-base font-semibold text-text-primary group-hover:text-primary transition-colors">Usuários</h3>
+              <p className="text-sm text-text-muted">Gerenciar usuários, funções e permissões</p>
             </div>
             <ChevronRight size={18} className="text-text-muted group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
           </div>

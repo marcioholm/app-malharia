@@ -29,6 +29,7 @@ const navItems = [
       { to: '/reports', label: 'Relatórios', icon: BarChart3 },
       { to: '/settings', label: 'Configurações' },
       { to: '/settings/company', label: 'Minha Empresa' },
+      { to: '/settings/users', label: 'Usuários' },
     ],
   },
 ]

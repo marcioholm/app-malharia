@@ -90,6 +90,25 @@ export const authService = {
     return data
   },
 
+  async createUser(email, password, name, role = 'visualizador') {
+    const { data, error } = await supabase.rpc('admin_create_user', {
+      p_email: email,
+      p_password: password,
+      p_name: name,
+      p_role: role,
+    })
+    if (error) throw error
+    return data
+  },
+
+  async getAvailableRoles(userRole) {
+    const hierarchy = {
+      super_admin: ['super_admin', 'admin_empresa', 'gerente', 'vendedor', 'producao', 'visualizador'],
+      admin_empresa: ['gerente', 'vendedor', 'producao', 'visualizador'],
+    }
+    return hierarchy[userRole] || []
+  },
+
   async can(action, profile) {
     if (!profile) return false
     const role = normalizeRole(profile.role)

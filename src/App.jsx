@@ -13,6 +13,7 @@ import { Kanban } from './pages/Kanban'
 import { Reports } from './pages/Reports'
 import { Settings } from './pages/Settings'
 import { CompanySettings } from './pages/CompanySettings'
+import { UsersSettings } from './pages/UsersSettings'
 
 export default function App() {
   return (
@@ -45,6 +46,7 @@ export default function App() {
           <Route path="/reports" element={<Reports />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/settings/company" element={<CompanySettings />} />
+          <Route path="/settings/users" element={<UsersSettings />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
