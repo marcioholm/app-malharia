@@ -86,7 +86,7 @@ export function Dashboard() {
           <CardContent>
             {productionByStage.length > 0 ? (
               <div className="h-72">
-                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={productionByStage} barCategoryGap="20%">
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                     <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
