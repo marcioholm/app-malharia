@@ -114,7 +114,20 @@ CREATE TRIGGER set_production_order_audit_company_id
   FOR EACH ROW EXECUTE FUNCTION set_company_id();
 
 -- ============================================================
--- 7. UPDATE RLS FOR COMPANIES - ALLOW SUPER_ADMIN
+-- 7. SECURITY DEFINER HELPER FOR SUPER_ADMIN CHECK
+-- ============================================================
+-- Avoids infinite RLS recursion caused by inline EXISTS subquery on profiles
+CREATE OR REPLACE FUNCTION is_super_admin()
+RETURNS BOOLEAN
+LANGUAGE SQL
+STABLE
+SECURITY DEFINER
+AS $$
+  SELECT EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'super_admin')
+$$;
+
+-- ============================================================
+-- 8. UPDATE RLS FOR COMPANIES - ALLOW SUPER_ADMIN
 -- ============================================================
 DROP POLICY IF EXISTS "Users can view their own company" ON companies;
 CREATE POLICY "Users can view their own company"
@@ -122,7 +135,7 @@ CREATE POLICY "Users can view their own company"
   USING (
     id = get_user_company_id()
     OR
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'super_admin')
+    is_super_admin()
   );
 
 DROP POLICY IF EXISTS "Users can view profiles in their company" ON profiles;
@@ -131,7 +144,7 @@ CREATE POLICY "Users can view profiles in their company"
   USING (
     company_id = get_user_company_id()
     OR
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'super_admin')
+    is_super_admin()
   );
 
 -- Allow super_admin to update companies
@@ -141,11 +154,11 @@ CREATE POLICY "Users can update companies"
   USING (
     id = get_user_company_id()
     OR
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'super_admin')
+    is_super_admin()
   );
 
 -- ============================================================
--- 8. UPDATE handle_new_user - SAFE VERSION
+-- 9. UPDATE handle_new_user - SAFE VERSION
 -- ============================================================
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
@@ -170,14 +183,14 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ============================================================
--- 9. EXPAND STORAGE BUCKET FOR ORDER IMAGES
+-- 10. EXPAND STORAGE BUCKET FOR ORDER IMAGES
 -- ============================================================
 UPDATE storage.buckets
 SET allowed_mime_types = ARRAY['image/png', 'image/jpeg', 'image/svg+xml', 'image/webp']
 WHERE id = 'order-images';
 
 -- ============================================================
--- 10. SEED NOTIFICATIONS TABLE IF NOT EXISTS
+-- 11. SEED NOTIFICATIONS TABLE IF NOT EXISTS
 -- ============================================================
 CREATE TABLE IF NOT EXISTS notifications (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
