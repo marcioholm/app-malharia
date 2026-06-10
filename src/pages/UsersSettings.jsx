@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { UserPlus, Shield, ChevronLeft, User, Mail, Key, Check, X, Loader2 } from 'lucide-react'
+import { UserPlus, Shield, ChevronLeft, ChevronDown, ChevronUp, User, Mail, Key, Check, X, Loader2, Info } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
@@ -18,6 +18,64 @@ const roleOptions = [
   { value: 'visualizador', label: 'Visualizador', color: 'bg-gray-100 text-gray-700' },
 ]
 
+const rolePermissions = [
+  {
+    role: 'admin_empresa',
+    label: 'Admin Empresa',
+    color: 'bg-purple-100 text-purple-700 border-purple-200',
+    icon: 'bg-purple-500',
+    permissions: [
+      'Criar, editar e excluir OS',
+      'Gerenciar clientes e produtos',
+      'Gerenciar usuários e permissões',
+      'Acessar relatórios financeiros',
+      'Configurar dados da empresa',
+    ],
+  },
+  {
+    role: 'gerente',
+    label: 'Gerente',
+    color: 'bg-blue-100 text-blue-700 border-blue-200',
+    icon: 'bg-blue-500',
+    permissions: [
+      'Criar e editar OS',
+      'Gerenciar produção (avançar/voltar fases)',
+      'Visualizar relatórios',
+    ],
+  },
+  {
+    role: 'vendedor',
+    label: 'Vendedor',
+    color: 'bg-green-100 text-green-700 border-green-200',
+    icon: 'bg-green-500',
+    permissions: [
+      'Criar OS',
+      'Definir valores financeiros (entrada, forma pagamento)',
+      'Visualizar próprias vendas',
+    ],
+  },
+  {
+    role: 'producao',
+    label: 'Produção',
+    color: 'bg-amber-100 text-amber-700 border-amber-200',
+    icon: 'bg-amber-500',
+    permissions: [
+      'Avançar/voltar fases da produção',
+      'Atualizar status das OS',
+    ],
+  },
+  {
+    role: 'visualizador',
+    label: 'Visualizador',
+    color: 'bg-gray-100 text-gray-700 border-gray-200',
+    icon: 'bg-gray-500',
+    permissions: [
+      'Visualizar OS, clientes e produtos',
+      'Sem permissão para criar ou editar',
+    ],
+  },
+]
+
 export function UsersSettings() {
   const navigate = useNavigate()
   const [users, setUsers] = useState([])
@@ -25,6 +83,7 @@ export function UsersSettings() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(null)
   const [showForm, setShowForm] = useState(false)
+  const [showRoleInfo, setShowRoleInfo] = useState(false)
   const [form, setForm] = useState({ name: '', email: '', password: '', role: 'visualizador' })
   const [creating, setCreating] = useState(false)
 
@@ -129,6 +188,42 @@ export function UsersSettings() {
           <h1 className="text-2xl font-bold text-text-primary">Usuários</h1>
           <p className="text-sm text-text-muted mt-1">Gerenciar usuários e permissões da empresa</p>
         </div>
+      </div>
+
+      <div className="rounded-2xl border border-border bg-card-bg overflow-hidden">
+        <button
+          onClick={() => setShowRoleInfo(!showRoleInfo)}
+          className="flex w-full items-center justify-between p-4 text-left hover:bg-gray-50 transition-colors cursor-pointer"
+        >
+          <div className="flex items-center gap-2">
+            <Info size={16} className="text-primary" />
+            <span className="text-sm font-medium text-text-primary">Níveis de acesso por função</span>
+          </div>
+          {showRoleInfo ? <ChevronUp size={16} className="text-text-muted" /> : <ChevronDown size={16} className="text-text-muted" />}
+        </button>
+        {showRoleInfo && (
+          <div className="px-4 pb-4 grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+            {rolePermissions.filter(r => {
+              if (userRole === 'super_admin') return true
+              return r.role !== 'admin_empresa'
+            }).map(r => (
+              <div key={r.role} className={`rounded-xl border p-3 ${r.color}`}>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className={`w-2.5 h-2.5 rounded-full ${r.icon}`} />
+                  <span className="text-xs font-bold">{r.label}</span>
+                </div>
+                <ul className="space-y-1">
+                  {r.permissions.map((p, i) => (
+                    <li key={i} className="text-xs flex items-start gap-1.5">
+                      <span className="mt-0.5">•</span>
+                      {p}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <Card>
