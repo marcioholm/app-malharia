@@ -1,6 +1,9 @@
 import { supabase } from '../lib/supabase'
 
+let cachedFilter = null
+
 async function getCompanyFilter() {
+  if (cachedFilter) return cachedFilter
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
@@ -11,9 +14,24 @@ async function getCompanyFilter() {
     .single()
 
   if (!profile) return null
-  if (profile.role === 'super_admin') return null
-  return profile.company_id
+  cachedFilter = profile.role === 'super_admin' ? null : profile.company_id
+  return cachedFilter
 }
+
+export function clearDashboardCache() {
+  cachedFilter = null
+}
+
+const stageNamePosition = [
+  'Aprovação de Orçamento',
+  'Desenho',
+  'Impressão',
+  'Calandra',
+  'Corte',
+  'Costura',
+  'Acabamento',
+  'Finalizado',
+]
 
 export const dashboardService = {
   async getMetrics() {
@@ -41,7 +59,7 @@ export const dashboardService = {
 
     let monthQuery = supabase
       .from('production_orders')
-      .select('total_price, entry_amount, payment_status')
+      .select('total_price, entry_amount, remaining_amount, payment_status')
       .gte('created_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString())
     if (companyId) monthQuery = monthQuery.eq('company_id', companyId)
     const { data: monthOrders } = await monthQuery
@@ -62,29 +80,26 @@ export const dashboardService = {
   },
 
   async getProductionByStage() {
-    const { data: stages } = await supabase
-      .from('production_stages')
-      .select('*')
-      .order('position')
+    const companyId = await getCompanyFilter()
 
-    if (!stages) return []
+    let query = supabase
+      .from('production_orders')
+      .select('current_stage, status')
+      .in('status', ['aberta', 'em_producao', 'pausada'])
+    if (companyId) query = query.eq('company_id', companyId)
 
-    const result = []
-    for (const stage of stages) {
-      let query = supabase
-        .from('production_orders')
-        .select('*', { count: 'exact', head: true })
-        .eq('current_stage', stage.name)
-        .in('status', ['aberta', 'em_producao', 'pausada'])
+    const { data: orders } = await query
+    if (!orders) return []
 
-      const companyId = await getCompanyFilter()
-      if (companyId) query = query.eq('company_id', companyId)
+    const countMap = {}
+    orders.forEach(o => {
+      const stage = o.current_stage || 'Sem fase'
+      countMap[stage] = (countMap[stage] || 0) + 1
+    })
 
-      const { count } = await query
-      result.push({ name: stage.name, value: count || 0 })
-    }
-
-    return result
+    return stageNamePosition
+      .filter(name => countMap[name])
+      .map(name => ({ name, value: countMap[name] || 0 }))
   },
 
   async getLatestOrders(limit = 5) {

@@ -7,6 +7,7 @@ import { Badge } from '../ui/badge'
 import { DropdownMenu, DropdownTrigger, DropdownContent, DropdownItem, DropdownSeparator } from '../ui/dropdown-menu'
 import { notificationService } from '../../services/notifications'
 import { formatDate, roleLabels, normalizeRole } from '../../lib/utils'
+import { clearDashboardCache } from '../../services/dashboard'
 
 export function Header({ title, onMenuClick }) {
   const [userName, setUserName] = useState('')
@@ -62,6 +63,7 @@ export function Header({ title, onMenuClick }) {
   }
 
   const handleLogout = async () => {
+    clearDashboardCache()
     await supabase.auth.signOut()
     navigate('/login')
   }

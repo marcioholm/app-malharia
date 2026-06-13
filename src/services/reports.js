@@ -395,6 +395,49 @@ export const reportsService = {
     })).sort((a, b) => b.stagesCompleted - a.stagesCompleted)
   },
 
+  async getCommissionSummary() {
+    const { company_id, role } = await getUserCompanyId()
+
+    let query = supabase
+      .from('production_orders')
+      .select('id, commission_percentage, commission_value, commission_blocked, total_price, seller_id, seller:profiles!seller_id(name)')
+      .not('commission_percentage', 'is', null)
+      .not('commission_blocked', 'eq', true)
+      .in('status', ['em_producao', 'finalizada', 'entregue'])
+    if (company_id && role !== 'super_admin') query = query.eq('company_id', company_id)
+
+    const { data: orders } = await query
+    if (!orders) return { totalCommission: 0, paidCommission: 0, pendingCommission: 0, bySeller: [] }
+
+    const totalCommission = orders.reduce((s, o) => s + Number(o.commission_value || 0), 0)
+    const pendingOrders = orders.filter(o => {
+      if (o.commission_blocked) return false
+      if (o.commission_percentage === null) return false
+      return o.status !== 'finalizada' && o.status !== 'entregue'
+    })
+    const pendingCommission = pendingOrders.reduce((s, o) => s + Number(o.commission_value || 0), 0)
+    const paidCommission = totalCommission - pendingCommission
+
+    const sellerMap = {}
+    orders.forEach(o => {
+      if (!o.seller_id) return
+      if (!sellerMap[o.seller_id]) {
+        sellerMap[o.seller_id] = {
+          sellerId: o.seller_id,
+          name: o.seller?.name || 'Desconhecido',
+          totalCommission: 0,
+          osCount: 0,
+        }
+      }
+      sellerMap[o.seller_id].totalCommission += Number(o.commission_value || 0)
+      sellerMap[o.seller_id].osCount++
+    })
+
+    const bySeller = Object.values(sellerMap).sort((a, b) => b.totalCommission - a.totalCommission)
+
+    return { totalCommission, paidCommission, pendingCommission, bySeller }
+  },
+
   async getFullHistory(limit = 100) {
     const { company_id, role } = await getUserCompanyId()
 

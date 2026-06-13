@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import {
   History, FileText, Table, DollarSign, TrendingUp, BarChart3, Users,
-  AlertCircle, Clock, CheckCircle2, ShoppingBag
+  AlertCircle, Clock, CheckCircle2, ShoppingBag, Percent
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card'
@@ -37,6 +37,8 @@ export function Reports() {
   const [clientRanking, setClientRanking] = useState([])
   const [productRanking, setProductRanking] = useState([])
   const [teamPerformance, setTeamPerformance] = useState([])
+  const [commissionData, setCommissionData] = useState(null)
+  const [commissionLoading, setCommissionLoading] = useState(false)
   const [period, setPeriod] = useState('month')
 
   const loadAll = useCallback(async () => {
@@ -51,6 +53,7 @@ export function Reports() {
         reportsService.getClientRanking(),
         reportsService.getProductRanking(),
         reportsService.getTeamPerformance(),
+        reportsService.getCommissionSummary(),
       ])
       if (results[0].status === 'fulfilled') setFinancial(results[0].value)
       if (results[1].status === 'fulfilled') setSalesBySeller(results[1].value)
@@ -60,6 +63,7 @@ export function Reports() {
       if (results[5].status === 'fulfilled') setClientRanking(results[5].value)
       if (results[6].status === 'fulfilled') setProductRanking(results[6].value)
       if (results[7].status === 'fulfilled') setTeamPerformance(results[7].value)
+      if (results[8].status === 'fulfilled') setCommissionData(results[8].value)
     } catch (err) {
       toast.error(`Erro ao carregar relatórios: ${err.message}`)
     } finally {
@@ -194,6 +198,58 @@ export function Reports() {
                   )}
                 </CardContent>
               </Card>
+
+              {/* Comissões */}
+              {commissionData && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Percent size={16} className="text-primary" />
+                      Comissões
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid gap-4 grid-cols-1 sm:grid-cols-3 mb-6">
+                      <div className="rounded-xl border border-border p-4">
+                        <p className="text-xs font-medium text-text-muted uppercase tracking-wider">Total</p>
+                        <p className="text-2xl font-bold text-text-primary mt-1">{formatCurrency(commissionData.totalCommission)}</p>
+                      </div>
+                      <div className="rounded-xl border border-border p-4">
+                        <p className="text-xs font-medium text-text-muted uppercase tracking-wider">Pendente</p>
+                        <p className="text-2xl font-bold text-warning mt-1">{formatCurrency(commissionData.pendingCommission)}</p>
+                      </div>
+                      <div className="rounded-xl border border-border p-4">
+                        <p className="text-xs font-medium text-text-muted uppercase tracking-wider">Pago</p>
+                        <p className="text-2xl font-bold text-success mt-1">{formatCurrency(commissionData.paidCommission)}</p>
+                      </div>
+                    </div>
+                    {commissionData.bySeller.length > 0 ? (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-border">
+                              <th className="text-left py-3 px-2 font-medium text-text-muted">Vendedor</th>
+                              <th className="text-right py-3 px-2 font-medium text-text-muted">OS</th>
+                              <th className="text-right py-3 px-2 font-medium text-text-muted">Comissão Total</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border-light">
+                            {commissionData.bySeller.map(s => (
+                              <tr key={s.sellerId} className="hover:bg-gray-50">
+                                <td className="py-3 px-2 font-medium text-text-primary">{s.name}</td>
+                                <td className="py-3 px-2 text-right text-text-secondary">{s.osCount}</td>
+                                <td className="py-3 px-2 text-right font-medium">{formatCurrency(s.totalCommission)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-text-muted text-center py-4">Nenhuma comissão registrada</p>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
 
               <div className="grid gap-5 grid-cols-1 lg:grid-cols-2">
                 {/* Client Ranking */}
