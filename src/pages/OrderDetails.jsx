@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, CheckCircle, XCircle, User, Calendar, Hash, Package, Clock, AlertCircle,
-  Printer, PauseCircle, PlayCircle, Undo2, Edit3, Save, ImageUp, X, DollarSign, BadgeCheck,
-  CreditCard, History, GripVertical, RotateCcw
+  Printer, PauseCircle, PlayCircle, Undo2, Edit3, Save, ImageUp, X, DollarSign,
+  CreditCard, History, RotateCcw, Link as LinkIcon, Shield, Copy, Percent
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Button } from '../components/ui/button'
@@ -14,12 +14,12 @@ import { Badge } from '../components/ui/badge'
 import { StatusBadge, PriorityBadge } from '../components/ui/status-badge'
 import { StageProgress } from '../components/ui/progress'
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '../components/ui/accordion'
-import { Avatar } from '../components/ui/avatar'
-import { formatDate, formatCurrency, paymentStatusLabels, paymentStatusColors, paymentMethodLabels, roleLabels, normalizeRole } from '../lib/utils'
+import { formatDate, formatCurrency, paymentStatusLabels, paymentMethodLabels, roleLabels, normalizeRole, budgetStatusLabels, budgetStatusColors } from '../lib/utils'
 import { ordersService } from '../services/orders'
 import { authService } from '../services/auth'
 
 const stageNames = [
+  { name: 'Aprovação de Orçamento' },
   { name: 'Desenho' },
   { name: 'Impressão' },
   { name: 'Calandra' },
@@ -35,6 +35,8 @@ export function OrderDetails() {
   const [order, setOrder] = useState(null)
   const [history, setHistory] = useState([])
   const [audit, setAudit] = useState([])
+  const [timeline, setTimeline] = useState([])
+  const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(null)
   const [editing, setEditing] = useState(false)
@@ -45,14 +47,18 @@ export function OrderDetails() {
 
   const load = async () => {
     try {
-      const [o, h, a] = await Promise.all([
+      const [o, h, a, t, prof] = await Promise.all([
         ordersService.getById(id),
         ordersService.getHistory(id),
         ordersService.getAudit(id),
+        ordersService.getTimeline(id),
+        authService.getCurrentUser().then(u => u ? authService.getProfile(u.id) : null),
       ])
       setOrder(o)
       setHistory(h)
       setAudit(a)
+      setTimeline(t)
+      setProfile(prof)
       setEditForm({
         client_id: o.client_id || '',
         product_id: o.product_id || '',
@@ -68,6 +74,10 @@ export function OrderDetails() {
         contact_person: o.contact_person || '',
         phone: o.phone || '',
         notes: o.notes || '',
+        estimated_value: o.estimated_value || 0,
+        discount_value: o.discount_value || 0,
+        commission_percentage: o.commission_percentage || 0,
+        commission_value: o.commission_value || 0,
       })
 
       const s = await authService.getUsersByRole(['vendedor', 'seller', 'gerente', 'manager', 'admin_empresa', 'admin'])
@@ -81,6 +91,12 @@ export function OrderDetails() {
   }
 
   useEffect(() => { load() }, [id])
+
+  const userRole = normalizeRole(profile?.role)
+  const isAdmin = userRole === 'super_admin' || userRole === 'admin_empresa'
+  const isProduction = userRole === 'producao'
+  const isViewer = userRole === 'visualizador'
+  const canEdit = isAdmin || userRole === 'gerente' || userRole === 'vendedor'
 
   const doAction = async (action, fn, successMsg) => {
     setActionLoading(action)
@@ -106,7 +122,7 @@ export function OrderDetails() {
   }
 
   const handleReopen = () => {
-    if (!confirm('Reabrir esta OS? Ela voltará ao status "Aberta".')) return
+    if (!confirm('Reabrir esta OS?')) return
     doAction('reopen', () => ordersService.reopen(id), 'OS reaberta com sucesso!')
   }
 
@@ -126,6 +142,24 @@ export function OrderDetails() {
   const handleGoBack = () => {
     if (!confirm('Voltar para a fase anterior?')) return
     doAction('goback', () => ordersService.moveToPreviousStage(id), 'Fase revertida!')
+  }
+
+  const handleApproveBudget = () => {
+    if (!confirm('Aprovar orçamento? A OS poderá avançar para Desenho.')) return
+    doAction('approve_budget', () => ordersService.approveBudgetInternal(id), 'Orçamento aprovado!')
+  }
+
+  const handleGenerateBudgetLink = async () => {
+    try {
+      const token = await ordersService.generateBudgetToken(id)
+      const url = await ordersService.getBudgetPublicUrl(id)
+      if (url) {
+        await navigator.clipboard.writeText(url)
+        toast.success('Link de orçamento copiado!')
+      }
+    } catch (err) {
+      toast.error(`Erro ao gerar link: ${err.message}`)
+    }
   }
 
   const handleSaveEdit = async () => {
@@ -149,11 +183,21 @@ export function OrderDetails() {
         }
       })
 
-      // Recalculate remaining_amount
       if (updateData.total_price !== undefined || updateData.entry_amount !== undefined) {
         const total = Number(updateData.total_price ?? order?.total_price ?? 0)
         const entry = Number(updateData.entry_amount ?? order?.entry_amount ?? 0)
         updateData.remaining_amount = total - entry
+        updateData.payment_status = entry <= 0 ? 'sem_entrada' : entry >= total ? 'pago' : 'entrada_parcial'
+      }
+
+      if (updateData.commission_percentage !== undefined && isAdmin) {
+        const total = Number(updateData.total_price ?? order?.total_price ?? 0)
+        updateData.commission_value = (total * Number(updateData.commission_percentage)) / 100
+      }
+
+      if (!isAdmin) {
+        delete updateData.commission_percentage
+        delete updateData.commission_value
       }
 
       await ordersService.update(id, updateData, changedFields)
@@ -240,9 +284,11 @@ export function OrderDetails() {
   const totalValue = items.reduce((s, i) => s + Number(i.total_price || 0), 0)
   const images = order.production_order_images || []
 
+  const budgetNotApproved = order.budget_status === 'pending' || order.budget_status === 'revision_requested'
+  const canAdvanceFromBudget = order.budget_status === 'approved' || order.current_stage !== 'Aprovação de Orçamento'
+
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div className="flex items-start gap-4">
           <button
@@ -261,6 +307,14 @@ export function OrderDetails() {
                   {paymentStatusLabels[order.payment_status] || order.payment_status}
                 </Badge>
               )}
+              {order.budget_status && (
+                <Badge variant={
+                  order.budget_status === 'approved' ? 'success' :
+                  order.budget_status === 'rejected' ? 'danger' : 'warning'
+                }>
+                  Orçamento: {budgetStatusLabels[order.budget_status]}
+                </Badge>
+              )}
             </div>
             <p className="text-sm text-text-muted mt-1">Criada em {formatDate(order.created_at)}</p>
             {order.edited_at && (
@@ -269,15 +323,17 @@ export function OrderDetails() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => navigate(`/orders/${order.id}/print`)}>
-            <Printer size={16} /> Imprimir OS
-          </Button>
-          {!isFinished && (
+          {!isViewer && (
+            <Button variant="outline" onClick={() => navigate(`/orders/${order.id}/print`)}>
+              <Printer size={16} /> Imprimir OS
+            </Button>
+          )}
+          {canEdit && !isFinished && (
             <Button variant="outline" onClick={() => setEditing(!editing)}>
               <Edit3 size={16} /> {editing ? 'Cancelar Edição' : 'Editar Ordem'}
             </Button>
           )}
-          {isActive && (
+          {isActive && !isViewer && (
             <>
               {isPaused ? (
                 <Button variant="outline" onClick={handleResume} disabled={actionLoading === 'resume'}>
@@ -285,26 +341,52 @@ export function OrderDetails() {
                 </Button>
               ) : (
                 <>
-                  <Button variant="outline" onClick={handleGoBack} disabled={actionLoading === 'goback'}>
-                    <Undo2 size={16} /> {actionLoading === 'goback' ? 'Voltando...' : 'Voltar Fase'}
-                  </Button>
-                  <Button variant="outline" onClick={handleAdvance} disabled={actionLoading === 'advance'}>
+                  {!isProduction && (
+                    <Button variant="outline" onClick={handleGoBack} disabled={actionLoading === 'goback'}>
+                      <Undo2 size={16} /> {actionLoading === 'goback' ? 'Voltando...' : 'Voltar Fase'}
+                    </Button>
+                  )}
+                  <Button variant="outline" onClick={handleAdvance}
+                    disabled={actionLoading === 'advance' || (order.current_stage === 'Aprovação de Orçamento' && !canAdvanceFromBudget)}>
                     {actionLoading === 'advance' ? 'Avançando...' : 'Avançar Fase'}
                   </Button>
-                  <Button variant="outline" onClick={handlePause} disabled={actionLoading === 'pause'}>
-                    <PauseCircle size={16} /> {actionLoading === 'pause' ? 'Pausando...' : 'Pausar'}
-                  </Button>
+                  {!isProduction && (
+                    <Button variant="outline" onClick={handlePause} disabled={actionLoading === 'pause'}>
+                      <PauseCircle size={16} /> {actionLoading === 'pause' ? 'Pausando...' : 'Pausar'}
+                    </Button>
+                  )}
+                  {isAdmin && (
+                    <>
+                      {order.budget_status === 'pending' && order.current_stage === 'Aprovação de Orçamento' && (
+                        <Button onClick={handleApproveBudget} disabled={actionLoading === 'approve_budget'}>
+                          <CheckCircle size={16} /> Aprovar Orçamento
+                        </Button>
+                      )}
+                      {!order.public_budget_token && (
+                        <Button variant="outline" onClick={handleGenerateBudgetLink}>
+                          <LinkIcon size={16} /> Gerar Link
+                        </Button>
+                      )}
+                      {order.public_budget_token && (
+                        <Button variant="outline" onClick={handleGenerateBudgetLink}>
+                          <Copy size={16} /> Copiar Link
+                        </Button>
+                      )}
+                    </>
+                  )}
                   <Button onClick={handleFinish} disabled={actionLoading === 'finish'}>
                     <CheckCircle size={16} /> {actionLoading === 'finish' ? 'Finalizando...' : 'Finalizar'}
                   </Button>
-                  <Button variant="destructive" onClick={handleCancel} disabled={actionLoading === 'cancel'}>
-                    <XCircle size={16} /> {actionLoading === 'cancel' ? 'Cancelando...' : 'Cancelar'}
-                  </Button>
+                  {isAdmin && (
+                    <Button variant="destructive" onClick={handleCancel} disabled={actionLoading === 'cancel'}>
+                      <XCircle size={16} /> {actionLoading === 'cancel' ? 'Cancelando...' : 'Cancelar'}
+                    </Button>
+                  )}
                 </>
               )}
             </>
           )}
-          {isCancelled && (
+          {isCancelled && isAdmin && (
             <Button onClick={handleReopen} disabled={actionLoading === 'reopen'}>
               <RotateCcw size={16} /> {actionLoading === 'reopen' ? 'Reabrindo...' : 'Reabrir'}
             </Button>
@@ -321,24 +403,6 @@ export function OrderDetails() {
             <div className="space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-text-secondary">Cliente</label>
-                  <input
-                    type="text"
-                    className="flex h-10 w-full rounded-xl border border-border bg-gray-50 px-4 py-2 text-sm text-text-muted"
-                    value={order.clients?.name || '---'}
-                    disabled
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-text-secondary">Produto</label>
-                  <input
-                    type="text"
-                    className="flex h-10 w-full rounded-xl border border-border bg-gray-50 px-4 py-2 text-sm text-text-muted"
-                    value={order.products?.name || '---'}
-                    disabled
-                  />
-                </div>
-                <div className="space-y-2">
                   <label className="text-sm font-medium text-text-secondary">Vendedor</label>
                   <select
                     className="flex h-10 w-full rounded-xl border border-border bg-white px-4 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
@@ -350,15 +414,6 @@ export function OrderDetails() {
                       <option key={s.id} value={s.id}>{s.name}</option>
                     ))}
                   </select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-text-secondary">Quantidade</label>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={editForm.quantity}
-                    onChange={(e) => setEditForm({ ...editForm, quantity: parseInt(e.target.value) || 0 })}
-                  />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-text-secondary">Prazo de Entrega</label>
@@ -437,6 +492,19 @@ export function OrderDetails() {
                     <option value="outros">Outros</option>
                   </select>
                 </div>
+                {isAdmin && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-text-secondary">Comissão (%)</label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.5"
+                      value={editForm.commission_percentage}
+                      onChange={(e) => setEditForm({ ...editForm, commission_percentage: e.target.value })}
+                    />
+                  </div>
+                )}
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-text-secondary">Observações Financeiras</label>
@@ -465,7 +533,6 @@ export function OrderDetails() {
         </Card>
       ) : (
         <div className="grid gap-6 grid-cols-1 lg:grid-cols-5">
-          {/* Left column */}
           <div className="lg:col-span-3 space-y-6">
             <Card>
               <CardHeader>
@@ -527,12 +594,75 @@ export function OrderDetails() {
                         </div>
                       </div>
                     </div>
+                    {order.contact_person && (
+                      <div className="flex items-start gap-3">
+                        <User size={16} className="text-text-muted mt-0.5 shrink-0" />
+                        <div>
+                          <p className="text-xs text-text-muted">Contato</p>
+                          <p className="text-sm font-medium text-text-primary">{order.contact_person}</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
                 {order.notes && (
                   <div className="mt-6 pt-6 border-t border-border-light">
                     <p className="text-xs text-text-muted mb-2">Observações de Produção</p>
                     <p className="text-sm text-text-secondary bg-gray-50 rounded-xl p-4">{order.notes}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Budget Status Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield size={16} className="text-primary" />
+                  Orçamento
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Badge variant={
+                      order.budget_status === 'approved' ? 'success' :
+                      order.budget_status === 'rejected' ? 'danger' : 'warning'
+                    }>
+                      {budgetStatusLabels[order.budget_status] || 'Pendente'}
+                    </Badge>
+                    {order.budget_approved_at && (
+                      <span className="text-xs text-text-muted">
+                        Aprovado em {formatDate(order.budget_approved_at)}
+                      </span>
+                    )}
+                    {order.public_budget_approved_at && (
+                      <span className="text-xs text-text-muted">
+                        (pelo link público)
+                      </span>
+                    )}
+                  </div>
+                  {isAdmin && order.public_budget_token && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-text-muted">Link gerado</span>
+                      <Button variant="outline" size="sm" onClick={handleGenerateBudgetLink}>
+                        <Copy size={14} /> Copiar
+                      </Button>
+                    </div>
+                  )}
+                </div>
+                {!isViewer && !isProduction && (
+                  <div className="mt-4 flex items-center gap-3">
+                    {isAdmin && order.current_stage === 'Aprovação de Orçamento' && order.budget_status === 'pending' && (
+                      <Button size="sm" onClick={handleApproveBudget} disabled={actionLoading === 'approve_budget'}>
+                        <CheckCircle size={14} /> Aprovar Orçamento
+                      </Button>
+                    )}
+                    {isAdmin && !order.public_budget_token && (
+                      <Button size="sm" variant="outline" onClick={handleGenerateBudgetLink}>
+                        <LinkIcon size={14} /> Gerar Link Público
+                      </Button>
+                    )}
                   </div>
                 )}
               </CardContent>
@@ -578,6 +708,13 @@ export function OrderDetails() {
                     <span>Forma de pagamento: <strong>{paymentMethodLabels[order.payment_method] || order.payment_method}</strong></span>
                   </div>
                 )}
+                {/* Commission - only for admin roles */}
+                {isAdmin && order.commission_percentage > 0 && (
+                  <div className="mt-3 flex items-center gap-2 text-sm text-text-secondary">
+                    <Percent size={14} />
+                    <span>Comissão: <strong>{order.commission_percentage}%</strong> ({formatCurrency(order.commission_value)})</span>
+                  </div>
+                )}
                 {order.financial_notes && (
                   <div className="mt-3 p-3 rounded-xl bg-gray-50 text-sm text-text-secondary">
                     {order.financial_notes}
@@ -586,7 +723,7 @@ export function OrderDetails() {
               </CardContent>
             </Card>
 
-            {/* Items Table */}
+            {/* Items */}
             {items.length > 0 && (
               <Card>
                 <CardHeader>
@@ -681,11 +818,6 @@ export function OrderDetails() {
                                   <span className="text-text-muted">Conclusão:</span>
                                   <span className="text-text-primary">{stage.completed_at ? formatDate(stage.completed_at) : '---'}</span>
                                 </div>
-                                {stage.notes && (
-                                  <div className="rounded-lg bg-gray-50 p-3 text-sm text-text-secondary">
-                                    {stage.notes}
-                                  </div>
-                                )}
                               </div>
                             </AccordionContent>
                           </>
@@ -700,9 +832,8 @@ export function OrderDetails() {
             </Card>
           </div>
 
-          {/* Right column */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Images Gallery */}
+            {/* Images */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -716,25 +847,27 @@ export function OrderDetails() {
                     {images.map((img) => (
                       <div key={img.id} className="relative group rounded-xl border border-border overflow-hidden bg-gray-50">
                         <img src={img.image_url} alt="" className="w-full h-32 object-cover" />
-                        <button
-                          onClick={() => handleImageRemove(img.id)}
-                          className="absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                        >
-                          <X size={12} />
-                        </button>
+                        {!isViewer && (
+                          <button
+                            onClick={() => handleImageRemove(img.id)}
+                            className="absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                          >
+                            <X size={12} />
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
                 ) : order.reference_image_url ? (
                   <div className="mb-4">
-                    <p className="text-xs text-text-muted mb-2">Imagem legada (reference_image_url)</p>
+                    <p className="text-xs text-text-muted mb-2">Imagem legada</p>
                     <div className="relative group rounded-xl border border-border overflow-hidden bg-gray-50">
                       <img src={order.reference_image_url} alt="" className="w-full h-32 object-cover" />
                     </div>
                   </div>
                 ) : null}
 
-                {images.length < 5 && (
+                {!isViewer && images.length < 5 && (
                   <label className="flex flex-col items-center justify-center h-24 rounded-xl border-2 border-dashed border-border bg-gray-50 hover:border-primary/40 hover:bg-primary-bg/30 transition-all cursor-pointer">
                     <div className="flex flex-col items-center gap-1 text-text-muted">
                       <ImageUp size={20} />
@@ -754,6 +887,47 @@ export function OrderDetails() {
               </CardContent>
             </Card>
 
+            {/* Timeline */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Linha do Tempo</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {timeline.length > 0 ? (
+                  <div className="relative">
+                    <div className="absolute left-[7px] top-2 bottom-2 w-0.5 bg-border" />
+                    <div className="space-y-4">
+                      {timeline.map((entry, i) => (
+                        <div key={entry.id} className="relative flex gap-4">
+                          <div className={`relative z-10 mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 ${
+                            i === 0 ? 'border-primary bg-primary-bg' : 'border-border bg-card-bg'
+                          }`}>
+                            <div className={`h-2 w-2 rounded-full ${i === 0 ? 'bg-primary' : 'bg-border'}`} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-text-primary">{entry.description}</p>
+                            <div className="flex items-center gap-3 mt-1">
+                              <span className="text-xs text-text-muted">{formatDate(entry.created_at)}</span>
+                              {entry.profiles?.name && (
+                                <span className="flex items-center gap-1 text-xs text-text-muted">
+                                  <User size={10} /> {entry.profiles.name}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-sm text-text-muted">Nenhum evento registrado</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* History */}
             <Card>
               <CardHeader>
                 <CardTitle>Histórico</CardTitle>
@@ -762,7 +936,7 @@ export function OrderDetails() {
                 {history.length > 0 ? (
                   <div className="relative">
                     <div className="absolute left-[7px] top-2 bottom-2 w-0.5 bg-border" />
-                    <div className="space-y-6">
+                    <div className="space-y-4">
                       {history.map((h, i) => (
                         <div key={h.id} className="relative flex gap-4">
                           <div className={`relative z-10 mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 ${
@@ -786,23 +960,18 @@ export function OrderDetails() {
                     </div>
                   </div>
                 ) : (
-                  <div className="text-center py-8">
-                    <div className="h-12 w-12 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
-                      <Clock size={24} className="text-text-muted" />
-                    </div>
-                    <p className="text-sm text-text-muted">Nenhum registro no histórico</p>
-                  </div>
+                  <p className="text-sm text-text-muted text-center py-8">Nenhum registro no histórico</p>
                 )}
               </CardContent>
             </Card>
 
-            {/* Audit Trail */}
+            {/* Audit */}
             {audit.length > 0 && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <History size={16} className="text-primary" />
-                    Auditoria de Alterações
+                    Auditoria
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -825,28 +994,6 @@ export function OrderDetails() {
                 </CardContent>
               </Card>
             )}
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Responsáveis por Fase</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {orderedStages.slice(0, 7).map((stage) => (
-                    <div key={stage.id} className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className={`h-2 w-2 rounded-full ${
-                          stage.status === 'concluida' ? 'bg-success' :
-                          stage.status === 'em_andamento' ? 'bg-primary' : 'bg-border'
-                        }`} />
-                        <span className="text-sm text-text-secondary">{stage.production_stages?.name}</span>
-                      </div>
-                      <Avatar name="---" size="sm" />
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
           </div>
         </div>
       )}

@@ -129,3 +129,30 @@ export function formatCurrency(value) {
   if (value === null || value === undefined) return 'R$ 0,00'
   return Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 }
+
+export const budgetStatusLabels = {
+  pending: 'Pendente',
+  approved: 'Aprovado',
+  rejected: 'Recusado',
+  revision_requested: 'Revisão Solicitada',
+  expired: 'Expirado',
+}
+
+export const budgetStatusColors = {
+  pending: 'bg-warning-bg text-warning',
+  approved: 'bg-success-bg text-success',
+  rejected: 'bg-danger-bg text-danger',
+  revision_requested: 'bg-info-bg text-info',
+  expired: 'bg-gray-100 text-text-muted',
+}
+
+export const stageLabels = {
+  'Aprovação de Orçamento': 'Aprovação de Orçamento',
+  'Desenho': 'Desenho',
+  'Impressão': 'Impressão',
+  'Calandra': 'Calandra',
+  'Corte': 'Corte',
+  'Costura': 'Costura',
+  'Acabamento': 'Acabamento',
+  'Finalizado': 'Finalizado',
+}

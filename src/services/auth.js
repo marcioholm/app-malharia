@@ -116,7 +116,11 @@ export const authService = {
 
     const permissions = {
       super_admin: ['*'],
-      admin_empresa: ['create_os', 'edit_os', 'delete_os', 'manage_users', 'manage_clients', 'manage_products', 'view_reports', 'manage_company'],
+      admin_empresa: [
+        'create_os', 'edit_os', 'delete_os', 'manage_users', 'manage_clients',
+        'manage_products', 'view_reports', 'manage_company', 'edit_commission',
+        'approve_budget',
+      ],
       gerente: ['create_os', 'edit_os', 'manage_production', 'view_reports'],
       vendedor: ['create_os', 'view_own_sales', 'set_financial'],
       producao: ['update_stage', 'update_status'],

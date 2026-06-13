@@ -6,7 +6,7 @@ import { formatDate, formatCurrency, statusLabels, priorityLabels, paymentStatus
 import { ordersService } from '../services/orders'
 import { companyService } from '../services/company'
 
-const stageNames = ['Desenho', 'Impressão', 'Calandra', 'Corte', 'Costura', 'Acabamento', 'Finalizado']
+const stageNames = ['Aprovação de Orçamento', 'Desenho', 'Impressão', 'Calandra', 'Corte', 'Costura', 'Acabamento', 'Finalizado']
 
 function QRCodeSVG({ url }) {
   const [svg, setSvg] = useState('')
@@ -59,70 +59,47 @@ function PrintOS() {
           body { font-family: 'Inter', Arial, sans-serif; font-size: 10px; line-height: 1.4; color: #000; padding: 15mm 20mm; }
           table { width: 100%; border-collapse: collapse; }
           td, th { padding: 4px 6px; text-align: left; font-size: 10px; }
-          img { max-width: 100%; height: auto; }
-          .h-16 { height: 64px; }
-          .object-contain { object-fit: contain; }
-          .border-b { border-bottom: 1px solid #ddd; }
           .border { border: 1px solid #ddd; }
+          .border-b { border-bottom: 1px solid #ddd; }
           .border-t { border-top: 1px solid #ddd; }
           .text-center { text-align: center; }
           .text-right { text-align: right; }
           .font-bold { font-weight: 700; }
-          .text-sm { font-size: 9px; }
-          .text-xs { font-size: 8px; }
-          .text-base { font-size: 11px; }
           .text-lg { font-size: 14px; }
           .text-xl { font-size: 18px; }
-          .bg-gray-50 { background: #f9fafb; }
-          .rounded-lg { border-radius: 8px; }
-          .p-5 { padding: 20px; }
-          .mb-5 { margin-bottom: 20px; }
-          .pb-2 { padding-bottom: 8px; }
-          .flex-1 { flex: 1; }
-          .bg-gray-100 { background: #f3f4f6; }
+          .text-xs { font-size: 8px; }
+          .text-sm { font-size: 9px; }
+          .text-base { font-size: 11px; }
           .text-gray-500 { color: #6b7280; }
-          .text-gray-600 { color: #4b5563; }
-          .text-gray-700 { color: #374151; }
           .text-gray-900 { color: #111827; }
-          .text-green-600 { color: #16a34a; }
-          .text-blue-600 { color: #2563eb; }
-          .text-red-600 { color: #dc2626; }
-          .mb-1 { margin-bottom: 4px; }
-          .mb-2 { margin-bottom: 8px; }
-          .mb-4 { margin-bottom: 16px; }
-          .mb-6 { margin-bottom: 24px; }
-          .mb-8 { margin-bottom: 32px; }
-          .mt-1 { margin-top: 4px; }
-          .mt-2 { margin-top: 8px; }
-          .mt-4 { margin-top: 16px; }
-          .mt-6 { margin-top: 24px; }
-          .mt-8 { margin-top: 32px; }
-          .p-2 { padding: 8px; }
+          .bg-gray-50 { background: #f9fafb; }
+          .bg-gray-100 { background: #f3f4f6; }
+          .rounded { border-radius: 4px; }
+          .rounded-lg { border-radius: 8px; }
           .p-3 { padding: 12px; }
           .p-4 { padding: 16px; }
-          .pt-2 { padding-top: 8px; }
-          .pr-3 { padding-right: 12px; }
+          .p-5 { padding: 20px; }
+          .mb-2 { margin-bottom: 8px; }
+          .mb-3 { margin-bottom: 12px; }
+          .mb-4 { margin-bottom: 16px; }
+          .mb-5 { margin-bottom: 20px; }
+          .mt-2 { margin-top: 8px; }
+          .mt-4 { margin-top: 16px; }
+          .mt-8 { margin-top: 32px; }
           .flex { display: flex; }
+          .flex-1 { flex: 1; }
           .items-start { align-items: flex-start; }
           .items-center { align-items: center; }
           .justify-between { justify-content: space-between; }
           .gap-2 { gap: 8px; }
-          .gap-3 { gap: 12px; }
           .gap-4 { gap: 16px; }
           .gap-6 { gap: 24px; }
           .gap-8 { gap: 32px; }
           .w-1\\/2 { width: 50%; }
-          .w-1\\/3 { width: 33.333%; }
-          .w-2\\/3 { width: 66.666%; }
           .leading-relaxed { line-height: 1.6; }
-          .rounded { border-radius: 4px; }
-          .whitespace-nowrap { white-space: nowrap; }
           .uppercase { text-transform: uppercase; }
           .tracking-wider { letter-spacing: 0.05em; }
-          [data-print-only] { display: block; }
-          .checklist input { display: inline-block; width: 12px; height: 12px; border: 1px solid #999; margin-right: 6px; }
           .page-break { page-break-after: always; }
-          hr { border: none; border-top: 1px solid #ddd; margin: 16px 0; }
           .img-grid { display: flex; flex-wrap: wrap; gap: 8px; }
           .img-grid img { width: calc(33.333% - 6px); max-height: 200px; object-fit: contain; border: 1px solid #ddd; border-radius: 4px; }
         </style>
@@ -140,22 +117,13 @@ function PrintOS() {
             window.onafterprint = function() { window.close(); };
             window.print();
           }
-          if (len === 0) {
-            triggerPrint();
-          } else {
+          if (len === 0) { triggerPrint(); }
+          else {
             imgs.forEach(function(img) {
-              if (img.complete) {
-                loaded++;
-                if (loaded >= len) { triggerPrint(); }
-              } else {
-                img.addEventListener('load', function() {
-                  loaded++;
-                  if (loaded >= len) { triggerPrint(); }
-                });
-                img.addEventListener('error', function() {
-                  loaded++;
-                  if (loaded >= len) { triggerPrint(); }
-                });
+              if (img.complete) { loaded++; if (loaded >= len) triggerPrint(); }
+              else {
+                img.addEventListener('load', function() { loaded++; if (loaded >= len) triggerPrint(); });
+                img.addEventListener('error', function() { loaded++; if (loaded >= len) triggerPrint(); });
               }
             });
             setTimeout(triggerPrint, 3000);
@@ -185,15 +153,12 @@ function PrintOS() {
           .text-right { text-align: right; }
           .text-center { text-align: center; }
           .font-bold { font-weight: 700; }
-          .text-xs { font-size: 8px; }
-          .text-sm { font-size: 9px; }
-          .text-base { font-size: 11px; }
           .text-lg { font-size: 14px; }
           .text-xl { font-size: 18px; }
           .text-gray-500 { color: #6b7280; }
           .text-gray-900 { color: #111827; }
-          .rounded-lg { border-radius: 8px; }
-          .mb-2 { margin-bottom: 8px; }
+          .bg-gray-50 { background: #f9fafb; }
+          .bg-gray-100 { background: #f3f4f6; }
           .mb-3 { margin-bottom: 12px; }
           .mb-4 { margin-bottom: 16px; }
           .mb-5 { margin-bottom: 20px; }
@@ -201,7 +166,6 @@ function PrintOS() {
           .mt-8 { margin-top: 32px; }
           .p-3 { padding: 12px; }
           .p-5 { padding: 20px; }
-          .pb-2 { padding-bottom: 8px; }
           .flex { display: flex; }
           .flex-1 { flex: 1; }
           .items-center { align-items: center; }
@@ -209,16 +173,12 @@ function PrintOS() {
           .gap-8 { gap: 32px; }
           .w-1\\/2 { width: 50%; }
           .border-b { border-bottom: 1px solid #ddd; }
-          .bg-gray-50 { background: #f9fafb; }
-          .bg-gray-100 { background: #f3f4f6; }
-          hr { border: none; border-top: 1px solid #ddd; margin: 16px 0; }
+          .page-break { page-break-after: always; }
           .img-grid { display: flex; flex-wrap: wrap; gap: 8px; }
           .img-grid img { width: calc(33.333% - 6px); max-height: 200px; object-fit: contain; border: 1px solid #ddd; border-radius: 4px; }
         </style>
       </head>
-      <body>
-        ${content}
-      </body>
+      <body>${content}</body>
       </html>
     `], { type: 'text/html' })
     const url = URL.createObjectURL(blob)
@@ -276,8 +236,7 @@ function PrintOS() {
             onClick={() => navigate(`/orders/${order.id}`)}
             className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 cursor-pointer"
           >
-            <ArrowLeft size={16} />
-            Voltar
+            <ArrowLeft size={16} /> Voltar
           </button>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={handleDownload}>
@@ -292,7 +251,6 @@ function PrintOS() {
 
       <div className="max-w-[210mm] mx-auto bg-white shadow-lg my-8" style={{ minHeight: '297mm' }}>
         <div ref={printRef} className="p-[15mm_20mm]">
-          {/* === HEADER - COMPANY + OS === */}
           <div className="flex justify-between items-start mb-6 pb-4 border-b-2 border-gray-900">
             <div>
               {cmp.logo_url ? (
@@ -317,7 +275,7 @@ function PrintOS() {
             </div>
             <div className="text-right">
               <div className="text-xl font-bold text-gray-900">{order.order_number}</div>
-              <table className="mt-2 text-xs" style={{ borderCollapse: 'collapse' }}>
+              <table className="mt-2 text-xs">
                 <tbody>
                   <tr><td className="text-gray-500 pr-3 py-0.5">Data do Pedido:</td><td className="font-medium py-0.5">{formatDate(order.entry_date)}</td></tr>
                   <tr><td className="text-gray-500 pr-3 py-0.5">Previsão de Entrega:</td><td className="font-medium py-0.5">{formatDate(order.delivery_date)}</td></tr>
@@ -327,7 +285,6 @@ function PrintOS() {
             </div>
           </div>
 
-          {/* === CLIENTE === */}
           <div className="bg-gray-50 border border-gray-200 rounded p-3 mb-4">
             <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Dados do Cliente</div>
             <div className="flex gap-8 flex-wrap">
@@ -354,7 +311,6 @@ function PrintOS() {
             </div>
           </div>
 
-          {/* === DADOS DO PEDIDO === */}
           <div className="border border-gray-200 rounded-lg p-5 mb-5 bg-gray-50">
             <div className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3 pb-2 border-b border-gray-200">Dados do Pedido</div>
             <div className="flex gap-8 flex-wrap">
@@ -377,7 +333,6 @@ function PrintOS() {
             </div>
           </div>
 
-          {/* === TABELA DE ITENS === */}
           <div className="mb-4">
             <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Itens da Produção</div>
             <table className="w-full border border-gray-300">
@@ -412,7 +367,6 @@ function PrintOS() {
             </table>
           </div>
 
-          {/* === RESUMO DE TAMANHOS + FINANCEIRO === */}
           <div className="flex gap-4 mb-4">
             <div className="w-1/2 border border-gray-200 rounded p-3">
               <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Resumo por Tamanho</div>
@@ -449,8 +403,8 @@ function PrintOS() {
                     <td className="py-1 text-right font-medium">{totalQty} peças</td>
                   </tr>
                   <tr className="text-xs border-b border-gray-100">
-                    <td className="py-1 text-gray-500">Valor Unitário Médio</td>
-                    <td className="py-1 text-right font-medium">{formatCurrency(avgPrice)}</td>
+                    <td className="py-1 text-gray-500">Valor Total</td>
+                    <td className="py-1 text-right font-bold">{formatCurrency(totalValue)}</td>
                   </tr>
                   {order.payment_status && (
                     <tr className="text-xs border-b border-gray-100">
@@ -478,16 +432,11 @@ function PrintOS() {
                       <td className="py-1 text-right font-medium">{paymentMethodLabels[order.payment_method] || order.payment_method}</td>
                     </tr>
                   )}
-                  <tr className="text-sm">
-                    <td className="py-2 font-bold">Valor Total</td>
-                    <td className="py-2 text-right font-bold text-lg">{formatCurrency(totalValue)}</td>
-                  </tr>
                 </tbody>
               </table>
             </div>
           </div>
 
-          {/* === FASES DE PRODUÇÃO === */}
           <div className="border border-gray-200 rounded p-3 mb-4">
             <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Fases da Produção</div>
             <div className="flex flex-wrap gap-x-6 gap-y-1">
@@ -500,10 +449,9 @@ function PrintOS() {
             </div>
           </div>
 
-          {/* === OBSERVAÇÕES === */}
           <div className="border border-gray-200 rounded p-3 mb-4">
             <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Observações da Produção</div>
-            <div className="text-xs text-gray-400 leading-relaxed">
+            <div className="text-xs leading-relaxed">
               {order.notes ? (
                 <p className="text-sm text-gray-700">{order.notes}</p>
               ) : (
@@ -524,7 +472,6 @@ function PrintOS() {
             </div>
           )}
 
-          {/* === IMAGENS === */}
           {(images.length > 0 || order.reference_image_url) && (
             <>
               <div className="page-break" />
@@ -542,7 +489,6 @@ function PrintOS() {
             </>
           )}
 
-          {/* === QR CODE + ASSINATURAS === */}
           <div className="flex items-end justify-between mt-8 pt-4 border-t border-gray-300">
             <div className="flex gap-8">
               <div className="text-center">

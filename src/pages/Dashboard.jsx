@@ -1,40 +1,44 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FileText, PlayCircle, CheckCircle2, AlertCircle, Plus, Clock } from 'lucide-react'
+import { FileText, PlayCircle, CheckCircle2, AlertCircle, Plus, Clock, User, History } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { MetricCard } from '../components/ui/metric-card'
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card'
 import { StatusBadge, PriorityBadge } from '../components/ui/status-badge'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
-import { formatDate, getDeadlineStatus, deadlineStyles } from '../lib/utils'
+import { formatDate, formatCurrency, getDeadlineStatus, deadlineStyles } from '../lib/utils'
 import { dashboardService } from '../services/dashboard'
+import { ordersService } from '../services/orders'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts'
 
 export function Dashboard() {
-  const [metrics, setMetrics] = useState({ open: 0, inProduction: 0, finished: 0, delayed: 0 })
+  const [metrics, setMetrics] = useState({ open: 0, inProduction: 0, finished: 0, delayed: 0, monthValue: 0, totalReceived: 0, totalPending: 0 })
   const [productionByStage, setProductionByStage] = useState([])
   const [latestOrders, setLatestOrders] = useState([])
   const [upcoming, setUpcoming] = useState([])
   const [delayed, setDelayed] = useState([])
+  const [timeline, setTimeline] = useState([])
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [m, p, l, u, d] = await Promise.all([
+        const [m, p, l, u, d, t] = await Promise.all([
           dashboardService.getMetrics(),
           dashboardService.getProductionByStage(),
           dashboardService.getLatestOrders(),
           dashboardService.getUpcomingDeadlines(),
           dashboardService.getDelayedOrders(),
+          ordersService.getRecentTimeline(10),
         ])
         setMetrics(m)
         setProductionByStage(p)
         setLatestOrders(l)
         setUpcoming(u)
         setDelayed(d)
+        setTimeline(t)
       } catch (err) {
         console.error(err)
         toast.error('Erro ao carregar dashboard')
@@ -73,9 +77,15 @@ export function Dashboard() {
 
       <div className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard title="OS Abertas" value={metrics.open} icon={FileText} subtitle="Aguardando início" />
-        <MetricCard title="OS em Produção" value={metrics.inProduction} icon={PlayCircle} trend={12} subtitle="Em andamento" />
+        <MetricCard title="OS em Produção" value={metrics.inProduction} icon={PlayCircle} subtitle="Em andamento" />
         <MetricCard title="OS Atrasadas" value={metrics.delayed} icon={AlertCircle} className="border-danger/20" subtitle="Fora do prazo" />
-        <MetricCard title="OS Finalizadas" value={metrics.finished} icon={CheckCircle2} trend={24} subtitle="Concluídas no total" />
+        <MetricCard title="OS Finalizadas" value={metrics.finished} icon={CheckCircle2} subtitle="Concluídas" />
+      </div>
+
+      <div className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        <MetricCard title="Faturamento no Mês" value={formatCurrency(metrics.monthValue)} icon={FileText} subtitle="Valor total" />
+        <MetricCard title="Recebido no Mês" value={formatCurrency(metrics.totalReceived)} icon={CheckCircle2} subtitle="Entradas" />
+        <MetricCard title="Pendente" value={formatCurrency(metrics.totalPending)} icon={AlertCircle} subtitle="A receber" />
       </div>
 
       <div className="grid gap-6 grid-cols-1 lg:grid-cols-7">
@@ -156,7 +166,6 @@ export function Dashboard() {
         </Card>
       </div>
 
-      {/* Upcoming and Delayed */}
       <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
         <Card>
           <CardHeader>
@@ -219,11 +228,60 @@ export function Dashboard() {
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-success text-center py-8">Nenhuma OS atrasada! 🎉</p>
+              <p className="text-sm text-success text-center py-8">Nenhuma OS atrasada</p>
             )}
           </CardContent>
         </Card>
       </div>
+
+      {/* Timeline */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <History size={16} className="text-primary" />
+            Atividades Recentes
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {timeline.length > 0 ? (
+            <div className="relative">
+              <div className="absolute left-[7px] top-2 bottom-2 w-0.5 bg-border" />
+              <div className="space-y-4">
+                {timeline.map((entry, i) => (
+                  <div key={entry.id} className="relative flex gap-4">
+                    <div className={`relative z-10 mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 ${
+                      i === 0 ? 'border-primary bg-primary-bg' : 'border-border bg-card-bg'
+                    }`}>
+                      <div className={`h-2 w-2 rounded-full ${i === 0 ? 'bg-primary' : 'bg-border'}`} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-text-primary">{entry.description}</p>
+                      <div className="flex items-center gap-3 mt-1">
+                        <span className="text-xs text-text-muted">{formatDate(entry.created_at)}</span>
+                        {entry.profiles?.name && (
+                          <span className="flex items-center gap-1 text-xs text-text-muted">
+                            <User size={10} /> {entry.profiles.name}
+                          </span>
+                        )}
+                        {entry.production_orders?.order_number && (
+                          <button
+                            onClick={() => navigate(`/orders/${entry.order_id}`)}
+                            className="text-xs text-primary hover:underline"
+                          >
+                            #{entry.production_orders.order_number}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-text-muted text-center py-8">Nenhuma atividade recente</p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

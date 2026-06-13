@@ -1,16 +1,19 @@
 import { supabase } from '../lib/supabase'
 
+async function getProfile() {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+  const { data } = await supabase
+    .from('profiles')
+    .select('company_id, role')
+    .eq('id', user.id)
+    .single()
+  return data
+}
+
 export const companyService = {
   async getSettings() {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return null
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('company_id, role')
-      .eq('id', user.id)
-      .single()
-
+    const profile = await getProfile()
     if (!profile) return null
 
     let query = supabase
@@ -27,16 +30,8 @@ export const companyService = {
   },
 
   async saveSettings(settings) {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) throw new Error('Usuário não autenticado')
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('company_id')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile) throw new Error('Perfil não encontrado')
+    const profile = await getProfile()
+    if (!profile) throw new Error('Usuário não autenticado')
 
     const existing = await companyService.getSettings()
     let result
@@ -61,6 +56,22 @@ export const companyService = {
       if (error) throw error
       result = data
     }
+
+    // Also update companies table
+    if (settings.trade_name || settings.company_name || settings.cnpj) {
+      const companyUpdate = {}
+      if (settings.trade_name) companyUpdate.trade_name = settings.trade_name
+      if (settings.company_name) companyUpdate.legal_name = settings.company_name
+      if (settings.cnpj) companyUpdate.cnpj = settings.cnpj
+
+      if (Object.keys(companyUpdate).length > 0) {
+        await supabase
+          .from('companies')
+          .update(companyUpdate)
+          .eq('id', profile.company_id)
+      }
+    }
+
     return result
   },
 
@@ -79,6 +90,24 @@ export const companyService = {
     const { data: { publicUrl } } = supabase.storage
       .from('logos')
       .getPublicUrl(filePath)
+
+    // Save logo URL to company_settings
+    const settings = await companyService.getSettings()
+    if (settings) {
+      await supabase
+        .from('company_settings')
+        .update({ logo_url: publicUrl })
+        .eq('id', settings.id)
+    }
+
+    // Also update companies table
+    const profile = await getProfile()
+    if (profile) {
+      await supabase
+        .from('companies')
+        .update({ logo_url: publicUrl })
+        .eq('id', profile.company_id)
+    }
 
     return publicUrl
   },

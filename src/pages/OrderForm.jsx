@@ -1,27 +1,25 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Save, CheckCircle2, Plus, Trash2, UserPlus, ImageUp, X } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Trash2, UserPlus, ImageUp, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
-import { Select } from '../components/ui/select'
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card'
 import { Dialog, DialogHeader, DialogTitle, DialogContent } from '../components/ui/dialog'
 import { clientsService } from '../services/clients'
 import { productsService } from '../services/products'
 import { ordersService } from '../services/orders'
-import { authService } from '../services/auth'
+import { authService, normalizeRole } from '../services/auth'
 import { formatCurrency } from '../lib/utils'
-
-const defaultStages = ['Desenho', 'Impressão', 'Calandra', 'Corte', 'Costura', 'Acabamento']
 
 export function OrderForm() {
   const navigate = useNavigate()
   const [clients, setClients] = useState([])
   const [products, setProducts] = useState([])
   const [sellers, setSellers] = useState([])
+  const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(false)
   const [newClientOpen, setNewClientOpen] = useState(false)
   const [newClientForm, setNewClientForm] = useState({ name: '', phone: '', whatsapp: '', email: '', city: '' })
@@ -35,31 +33,39 @@ export function OrderForm() {
     phone: '',
     notes: '',
     seller_id: '',
+    estimated_value: 0,
+    discount_value: 0,
     entry_amount: 0,
     payment_method: '',
     financial_notes: '',
+    commission_percentage: 0,
   })
-  const [items, setItems] = useState([{ model: '', custom_name: '', size: '', quantity: 1, unit_price: 0 }])
+  const [items, setItems] = useState([{ model: '', custom_name: '', size: '', quantity: 1, unit_price: 0, notes: '' }])
   const [imageFiles, setImageFiles] = useState([])
   const [imagePreviews, setImagePreviews] = useState([])
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [c, p, s] = await Promise.all([
+        const [c, p, s, prof] = await Promise.all([
           clientsService.list(),
           productsService.list(),
           authService.getUsersByRole(['vendedor', 'seller', 'gerente', 'manager', 'admin_empresa', 'admin']),
+          authService.getCurrentUser().then(u => u ? authService.getProfile(u.id) : null),
         ])
         setClients(c)
         setProducts(p)
         setSellers(s)
+        setProfile(prof)
       } catch (err) {
         console.error(err)
       }
     }
     load()
   }, [])
+
+  const userRole = normalizeRole(profile?.role)
+  const isAdmin = userRole === 'super_admin' || userRole === 'admin_empresa'
 
   const handleClientChange = (clientId) => {
     const client = clients.find(c => c.id === clientId)
@@ -99,7 +105,7 @@ export function OrderForm() {
   }
 
   const addItem = () => {
-    setItems([...items, { model: '', custom_name: '', size: '', quantity: 1, unit_price: 0 }])
+    setItems([...items, { model: '', custom_name: '', size: '', quantity: 1, unit_price: 0, notes: '' }])
   }
 
   const removeItem = (i) => {
@@ -149,6 +155,7 @@ export function OrderForm() {
 
   const totalQty = items.reduce((s, i) => s + (Number(i.quantity) || 0), 0)
   const totalPrice = items.reduce((s, i) => s + (Number(i.quantity) || 0) * (Number(i.unit_price) || 0), 0)
+  const remainingAmount = totalPrice - (Number(form.entry_amount) || 0)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -159,6 +166,8 @@ export function OrderForm() {
         product_id: form.product_id,
         quantity: totalQty,
         total_price: totalPrice,
+        estimated_value: Number(form.estimated_value) || 0,
+        discount_value: Number(form.discount_value) || 0,
         entry_date: form.entry_date,
         delivery_date: form.delivery_date,
         priority: form.priority,
@@ -169,9 +178,12 @@ export function OrderForm() {
         entry_amount: Number(form.entry_amount) || 0,
         payment_method: form.payment_method || null,
         financial_notes: form.financial_notes || null,
+        commission_percentage: isAdmin ? (Number(form.commission_percentage) || 0) : 0,
+        commission_value: isAdmin ? (totalPrice * (Number(form.commission_percentage) || 0) / 100) : 0,
         order_number: await getNextOrderNumber(),
-        current_stage: 'Desenho',
+        current_stage: 'Aprovação de Orçamento',
         status: 'aberta',
+        budget_status: 'pending',
       }
       const created = await ordersService.create(orderData, items)
 
@@ -183,17 +195,18 @@ export function OrderForm() {
         }
       }
 
+      toast.success('OS criada com sucesso!')
       navigate('/orders')
     } catch (err) {
       console.error(err)
-      alert('Erro ao criar OS')
+      toast.error(`Erro ao criar OS: ${err.message}`)
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto space-y-6 relative pb-20">
       <div className="flex items-center gap-4">
         <button
           onClick={() => navigate('/orders')}
@@ -275,12 +288,16 @@ export function OrderForm() {
 
               <div className="space-y-2">
                 <Label>Prioridade</Label>
-                <Select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>
+                <select
+                  className="flex h-10 w-full rounded-xl border border-border bg-white px-4 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                  value={form.priority}
+                  onChange={(e) => setForm({ ...form, priority: e.target.value })}
+                >
                   <option value="baixa">Baixa</option>
                   <option value="normal">Normal</option>
                   <option value="alta">Alta</option>
                   <option value="urgente">Urgente</option>
-                </Select>
+                </select>
               </div>
 
               <div className="space-y-2">
@@ -297,7 +314,29 @@ export function OrderForm() {
             {/* Financial Section */}
             <div className="border-t border-border pt-6">
               <h3 className="text-base font-semibold text-text-primary mb-4">Informações Financeiras</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+                <div className="space-y-2">
+                  <Label>Valor Estimado</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.estimated_value}
+                    onChange={(e) => setForm({ ...form, estimated_value: e.target.value })}
+                    placeholder="0,00"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Desconto</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.discount_value}
+                    onChange={(e) => setForm({ ...form, discount_value: e.target.value })}
+                    placeholder="0,00"
+                  />
+                </div>
                 <div className="space-y-2">
                   <Label>Valor Total (itens)</Label>
                   <div className="flex h-10 items-center rounded-xl border border-border bg-gray-50 px-4 text-sm font-bold text-text-primary">
@@ -316,6 +355,14 @@ export function OrderForm() {
                   />
                 </div>
                 <div className="space-y-2">
+                  <Label>Saldo Restante</Label>
+                  <div className="flex h-10 items-center rounded-xl border border-border bg-gray-50 px-4 text-sm font-bold text-text-primary">
+                    {formatCurrency(Math.max(0, remainingAmount))}
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mt-4">
+                <div className="space-y-2">
                   <Label>Forma de Pagamento</Label>
                   <select
                     className="flex h-10 w-full rounded-xl border border-border bg-white px-4 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
@@ -332,12 +379,20 @@ export function OrderForm() {
                     <option value="outros">Outros</option>
                   </select>
                 </div>
-                <div className="space-y-2">
-                  <Label>Saldo Restante</Label>
-                  <div className="flex h-10 items-center rounded-xl border border-border bg-gray-50 px-4 text-sm font-bold text-text-primary">
-                    {formatCurrency(Math.max(0, totalPrice - (Number(form.entry_amount) || 0)))}
+                {isAdmin && (
+                  <div className="space-y-2">
+                    <Label>Comissão (%)</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.5"
+                      value={form.commission_percentage}
+                      onChange={(e) => setForm({ ...form, commission_percentage: e.target.value })}
+                      placeholder="0%"
+                    />
                   </div>
-                </div>
+                )}
               </div>
               <div className="mt-4 space-y-2">
                 <Label>Observações Financeiras</Label>
@@ -351,9 +406,9 @@ export function OrderForm() {
             </div>
 
             {/* Items */}
-            <div className="border-t border-border pt-6">
+            <div className="border-t border-border pt-6" id="items-section">
               <div className="flex items-center justify-between mb-4">
-                <Label className="text-base font-semibold">Itens da Produção</Label>
+                <h3 className="text-base font-semibold text-text-primary">Itens da Produção</h3>
                 <Button type="button" variant="outline" size="sm" onClick={addItem}>
                   <Plus size={14} /> Adicionar Item
                 </Button>
@@ -365,7 +420,7 @@ export function OrderForm() {
                       <th className="text-left py-2 pr-2">Modelo</th>
                       <th className="text-left py-2 px-2">Nome Personalizado</th>
                       <th className="text-center py-2 px-2 w-16">Tam</th>
-                      <th className="text-center py-2 px-2 w-24">Qtd</th>
+                      <th className="text-center py-2 px-2 w-20">Qtd</th>
                       <th className="text-right py-2 px-2 w-24">Valor Unit.</th>
                       <th className="text-right py-2 px-2 w-24">Valor Total</th>
                       <th className="w-8 py-2 pl-2" />
@@ -452,9 +507,9 @@ export function OrderForm() {
               <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={3} />
             </div>
 
-            {/* Multiple Images */}
+            {/* Images */}
             <div className="space-y-2">
-              <Label>Imagens da OS</Label>
+              <Label>Imagens da OS ({imageFiles.length}/5)</Label>
               <p className="text-xs text-text-muted">Anexe até 5 imagens para referência (JPG, PNG, WEBP — até 5MB cada)</p>
               <div className="flex flex-wrap gap-3">
                 {imagePreviews.map((preview, i) => (
@@ -478,18 +533,6 @@ export function OrderForm() {
                     <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleImageSelect} className="hidden" multiple />
                   </label>
                 )}
-              </div>
-            </div>
-
-            <div className="rounded-2xl bg-primary-bg border border-primary/20 p-5">
-              <p className="text-sm font-medium text-primary mb-3">Fases da produção que serão criadas automaticamente:</p>
-              <div className="flex flex-wrap gap-2">
-                {defaultStages.map((stage, i) => (
-                  <div key={stage} className="flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-text-secondary border border-border">
-                    <CheckCircle2 size={12} className="text-primary" />
-                    {stage}
-                  </div>
-                ))}
               </div>
             </div>
 
@@ -539,6 +582,16 @@ export function OrderForm() {
           </Dialog>
         </CardContent>
       </Card>
+
+      {/* Floating add button */}
+      <button
+        type="button"
+        onClick={addItem}
+        className="fixed bottom-8 right-8 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-white shadow-lg hover:bg-primary-dark hover:shadow-xl transition-all z-50 cursor-pointer"
+        title="Adicionar item"
+      >
+        <Plus size={24} />
+      </button>
     </div>
   )
 }

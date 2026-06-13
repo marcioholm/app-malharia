@@ -1,5 +1,15 @@
 import { supabase } from '../lib/supabase'
-import { notificationService } from './notifications'
+
+async function getCurrentProfile() {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+  const { data } = await supabase
+    .from('profiles')
+    .select('id, company_id, role')
+    .eq('id', user.id)
+    .single()
+  return data
+}
 
 export const ordersService = {
   async list(filters = {}) {
@@ -12,6 +22,16 @@ export const ordersService = {
     if (filters.priority) query = query.eq('priority', filters.priority)
     if (filters.seller_id) query = query.eq('seller_id', filters.seller_id)
     if (filters.payment_status) query = query.eq('payment_status', filters.payment_status)
+    if (filters.budget_status) query = query.eq('budget_status', filters.budget_status)
+    if (filters.stage) query = query.eq('current_stage', filters.stage)
+
+    if (filters.search) {
+      query = query.or(
+        `order_number.ilike.%${filters.search}%,` +
+        `clients.name.ilike.%${filters.search}%,` +
+        `products.name.ilike.%${filters.search}%`
+      )
+    }
 
     query = query.order('created_at', { ascending: false })
 
@@ -31,10 +51,10 @@ export const ordersService = {
   },
 
   async create(order, items = []) {
-    const { data: { user } } = await supabase.auth.getUser()
+    const profile = await getCurrentProfile()
     const orderData = {
       ...order,
-      created_by: user.id,
+      created_by: profile.id,
       remaining_amount: (Number(order.total_price) || 0) - (Number(order.entry_amount) || 0),
     }
     const { data, error } = await supabase
@@ -57,6 +77,7 @@ export const ordersService = {
           quantity: Number(i.quantity) || 1,
           unit_price: Number(i.unit_price) || 0,
           total_price: (Number(i.quantity) || 0) * (Number(i.unit_price) || 0),
+          notes: i.notes || null,
         }))
       if (orderItems.length > 0) {
         const { error: itemsError } = await supabase
@@ -66,14 +87,8 @@ export const ordersService = {
       }
     }
 
+    await ordersService.addTimeline(data.id, 'order_created', `Pedido #${data.order_number} foi criado`)
     await ordersService.addAudit(data.id, 'criacao', null, orderData, 'OS criada')
-
-    notificationService.create({
-      type: 'nova_os',
-      title: `Nova OS criada: ${data.order_number}`,
-      message: `OS ${data.order_number} foi criada e iniciada em Desenho`,
-      link: `/orders/${data.id}`,
-    })
 
     return data
   },
@@ -100,10 +115,10 @@ export const ordersService = {
   },
 
   async update(id, data, changedFields = {}) {
-    const { data: { user } } = await supabase.auth.getUser()
+    const profile = await getCurrentProfile()
     const updateData = {
       ...data,
-      edited_by: user.id,
+      edited_by: profile.id,
       edited_at: new Date().toISOString(),
     }
 
@@ -117,6 +132,11 @@ export const ordersService = {
       const total = data.total_price !== undefined ? Number(data.total_price) : Number(current?.total_price || 0)
       const entry = data.entry_amount !== undefined ? Number(data.entry_amount) : Number(current?.entry_amount || 0)
       updateData.remaining_amount = total - entry
+    }
+
+    if (data.commission_percentage !== undefined && data.commission_value !== undefined) {
+      const total = Number(data.total_price ?? 0)
+      updateData.commission_value = (total * Number(data.commission_percentage)) / 100
     }
 
     const { data: oldData } = await supabase
@@ -135,13 +155,25 @@ export const ordersService = {
       const descriptions = Object.entries(changedFields)
         .map(([field, values]) => `${field}: ${values.old} → ${values.new}`)
         .join(', ')
+      await ordersService.addTimeline(id, 'order_edited', `OS #${oldData?.order_number} foi editada: ${descriptions}`)
       await ordersService.addAudit(id, 'edicao', oldData, updateData, descriptions)
     } else {
+      await ordersService.addTimeline(id, 'order_edited', `OS #${oldData?.order_number} foi atualizada`)
       await ordersService.addAudit(id, 'edicao', oldData, updateData, 'OS atualizada')
     }
 
     return updateData
   },
+
+  async delete(id) {
+    const { error } = await supabase
+      .from('production_orders')
+      .delete()
+      .eq('id', id)
+    if (error) throw error
+  },
+
+  // ─── ITEMS ────────────────────────────────────────────────
 
   async deleteItems(orderId) {
     const { error } = await supabase
@@ -162,12 +194,31 @@ export const ordersService = {
       quantity: Number(i.quantity) || 1,
       unit_price: Number(i.unit_price) || 0,
       total_price: (Number(i.quantity) || 0) * (Number(i.unit_price) || 0),
+      notes: i.notes || null,
     }))
     const { error } = await supabase
       .from('order_items')
       .insert(orderItems)
     if (error) throw error
   },
+
+  async updateItem(itemId, data) {
+    const { error } = await supabase
+      .from('order_items')
+      .update(data)
+      .eq('id', itemId)
+    if (error) throw error
+  },
+
+  async deleteItem(itemId) {
+    const { error } = await supabase
+      .from('order_items')
+      .delete()
+      .eq('id', itemId)
+    if (error) throw error
+  },
+
+  // ─── STATUS CHANGES ───────────────────────────────────────
 
   async finish(id) {
     const { data: order } = await supabase
@@ -184,13 +235,7 @@ export const ordersService = {
 
     await ordersService.addHistory(id, 'OS finalizada')
     await ordersService.addAudit(id, 'finalizacao', { status: order?.status }, { status: 'finalizada' }, 'OS finalizada')
-
-    notificationService.create({
-      type: 'finalizada',
-      title: `OS finalizada: ${order?.order_number}`,
-      message: `A OS ${order?.order_number} foi concluída`,
-      link: `/orders/${id}`,
-    })
+    await ordersService.addTimeline(id, 'order_completed', `Pedido #${order?.order_number} foi finalizado`)
   },
 
   async cancel(id) {
@@ -208,6 +253,7 @@ export const ordersService = {
 
     await ordersService.addHistory(id, 'OS cancelada')
     await ordersService.addAudit(id, 'cancelamento', null, { status: 'cancelada' }, 'OS cancelada')
+    await ordersService.addTimeline(id, 'order_cancelled', `Pedido #${order?.order_number} foi cancelado`)
   },
 
   async reopen(id) {
@@ -225,6 +271,7 @@ export const ordersService = {
 
     await ordersService.addHistory(id, 'OS reaberta')
     await ordersService.addAudit(id, 'reabertura', { status: 'cancelada' }, { status: 'aberta' }, 'OS reaberta')
+    await ordersService.addTimeline(id, 'order_reopened', `Pedido #${order?.order_number} foi reaberto`)
   },
 
   async pause(id) {
@@ -241,13 +288,7 @@ export const ordersService = {
     if (error) throw error
 
     await ordersService.addHistory(id, 'OS pausada')
-
-    notificationService.create({
-      type: 'pausada',
-      title: `OS pausada: ${order?.order_number}`,
-      message: `A OS ${order?.order_number} foi pausada na produção`,
-      link: `/orders/${id}`,
-    })
+    await ordersService.addTimeline(id, 'order_paused', `Pedido #${order?.order_number} foi pausado`)
   },
 
   async resume(id) {
@@ -264,7 +305,10 @@ export const ordersService = {
     if (error) throw error
 
     await ordersService.addHistory(id, 'OS retomada')
+    await ordersService.addTimeline(id, 'order_resumed', `Pedido #${order?.order_number} foi retomado`)
   },
+
+  // ─── STAGE MANAGEMENT ────────────────────────────────────
 
   async moveToNextStage(orderId) {
     const { data: order } = await supabase
@@ -302,18 +346,17 @@ export const ordersService = {
         .from('production_orders')
         .update({ current_stage: nextStage.production_stages?.name || null, status: 'em_producao' })
         .eq('id', orderId)
+
+      await ordersService.addTimeline(orderId, 'stage_changed',
+        `Pedido #${order.order_number} avançou para ${nextStage.production_stages?.name}`)
     } else {
       await supabase
         .from('production_orders')
         .update({ status: 'finalizada', current_stage: 'Finalizado' })
         .eq('id', orderId)
 
-      notificationService.create({
-        type: 'finalizada',
-        title: `OS finalizada: ${order.order_number}`,
-        message: `A OS ${order.order_number} concluiu todas as fases`,
-        link: `/orders/${orderId}`,
-      })
+      await ordersService.addTimeline(orderId, 'order_completed',
+        `Pedido #${order.order_number} concluiu todas as fases`)
     }
 
     await ordersService.addHistory(orderId, `Fase concluída: ${currentStage.production_stages?.name}`)
@@ -354,6 +397,8 @@ export const ordersService = {
       .eq('id', orderId)
 
     await ordersService.addHistory(orderId, `Fase revertida: ${currentStage.production_stages?.name}`)
+    await ordersService.addTimeline(orderId, 'stage_reverted',
+      `Pedido #${order.order_number} voltou para ${prevStage.production_stages?.name}`)
   },
 
   async moveToStage(orderId, stageName, stageId) {
@@ -396,7 +441,123 @@ export const ordersService = {
       .eq('id', orderId)
 
     await ordersService.addHistory(orderId, `Movida para: ${stageName}`)
+    await ordersService.addTimeline(orderId, 'stage_changed',
+      `Pedido #${order.order_number} movido para ${stageName}`)
   },
+
+  // ─── BUDGET MANAGEMENT ────────────────────────────────────
+
+  async generateBudgetToken(orderId) {
+    const token = Array.from({ length: 64 }, () =>
+      'abcdef0123456789'.charAt(Math.floor(Math.random() * 16))
+    ).join('')
+
+    const { data, error } = await supabase
+      .from('production_orders')
+      .update({
+        public_budget_token: token,
+        budget_status: 'pending',
+        budget_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      })
+      .eq('id', orderId)
+      .select('public_budget_token')
+      .single()
+
+    if (error) throw error
+
+    await ordersService.addTimeline(orderId, 'budget_sent',
+      `Orçamento enviado para aprovação do cliente`)
+
+    return data.public_budget_token
+  },
+
+  async approveBudgetInternal(orderId) {
+    const profile = await getCurrentProfile()
+    const { data: order } = await supabase
+      .from('production_orders')
+      .select('order_number')
+      .eq('id', orderId)
+      .single()
+
+    const { error } = await supabase
+      .from('production_orders')
+      .update({
+        budget_status: 'approved',
+        budget_approved: true,
+        budget_approved_by: profile.id,
+        budget_approved_at: new Date().toISOString(),
+      })
+      .eq('id', orderId)
+    if (error) throw error
+
+    await ordersService.addTimeline(orderId, 'budget_approved',
+      `Orçamento do pedido #${order?.order_number} foi aprovado por ${profile.id}`)
+    await ordersService.addAudit(orderId, 'aprovacao_orcamento',
+      { budget_status: 'pending' }, { budget_status: 'approved' }, 'Orçamento aprovado internamente')
+  },
+
+  async rejectBudgetInternal(orderId, reason) {
+    const profile = await getCurrentProfile()
+    const { data: order } = await supabase
+      .from('production_orders')
+      .select('order_number')
+      .eq('id', orderId)
+      .single()
+
+    const { error } = await supabase
+      .from('production_orders')
+      .update({
+        budget_status: 'rejected',
+        budget_customer_message: reason,
+      })
+      .eq('id', orderId)
+    if (error) throw error
+
+    await ordersService.addTimeline(orderId, 'budget_rejected',
+      `Orçamento do pedido #${order?.order_number} foi recusado`)
+  },
+
+  async getBudgetPublicUrl(orderId) {
+    const { data, error } = await supabase
+      .from('production_orders')
+      .select('public_budget_token')
+      .eq('id', orderId)
+      .single()
+    if (error) return null
+    if (!data?.public_budget_token) return null
+    return `${window.location.origin}/orcamento/${data.public_budget_token}`
+  },
+
+  // ─── COMMISSION ──────────────────────────────────────────
+
+  async updateCommission(orderId, percentage) {
+    const profile = await getCurrentProfile()
+    const { data: order } = await supabase
+      .from('production_orders')
+      .select('total_price, commission_percentage, order_number')
+      .eq('id', orderId)
+      .single()
+
+    if (!order) throw new Error('Ordem não encontrada')
+
+    const commissionValue = (Number(order.total_price || 0) * Number(percentage)) / 100
+
+    const { error } = await supabase
+      .from('production_orders')
+      .update({
+        commission_percentage: percentage,
+        commission_value: commissionValue,
+      })
+      .eq('id', orderId)
+    if (error) throw error
+
+    await ordersService.addAudit(orderId, 'comissao_alterada',
+      { commission_percentage: order.commission_percentage },
+      { commission_percentage: percentage, commission_value: commissionValue },
+      `Comissão alterada de ${order.commission_percentage || 0}% para ${percentage}%`)
+  },
+
+  // ─── HISTORY ─────────────────────────────────────────────
 
   async addHistory(orderId, description) {
     const { data: { user } } = await supabase.auth.getUser()
@@ -412,6 +573,52 @@ export const ordersService = {
       .select('*, profiles(name)')
       .eq('order_id', orderId)
       .order('created_at', { ascending: false })
+    if (error) throw error
+    return data
+  },
+
+  // ─── TIMELINE ────────────────────────────────────────────
+
+  async addTimeline(orderId, action, description) {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      await supabase.rpc('register_activity', {
+        p_order_id: orderId,
+        p_action: action,
+        p_description: description,
+        p_metadata: null,
+      })
+    } catch (err) {
+      console.error('Erro ao registrar timeline:', err)
+    }
+  },
+
+  async getTimeline(orderId) {
+    const { data, error } = await supabase
+      .from('activity_timeline')
+      .select('*, profiles(name)')
+      .eq('order_id', orderId)
+      .order('created_at', { ascending: false })
+    if (error) throw error
+    return data
+  },
+
+  async getRecentTimeline(limit = 20) {
+    const profile = await getCurrentProfile()
+    if (!profile) return []
+
+    let query = supabase
+      .from('activity_timeline')
+      .select('*, profiles(name), production_orders(order_number, status)')
+      .order('created_at', { ascending: false })
+      .limit(limit)
+
+    if (profile.role !== 'super_admin') {
+      query = query.eq('company_id', profile.company_id)
+    }
+
+    const { data, error } = await query
     if (error) throw error
     return data
   },

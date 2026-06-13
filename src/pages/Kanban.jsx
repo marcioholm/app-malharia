@@ -9,7 +9,8 @@ import { Badge } from '../components/ui/badge'
 import { StatusBadge, PriorityBadge } from '../components/ui/status-badge'
 import { Avatar } from '../components/ui/avatar'
 import { Button } from '../components/ui/button'
-import { formatDate, getDeadlineStatus, deadlineStyles } from '../lib/utils'
+import { Input } from '../components/ui/input'
+import { formatDate, getDeadlineStatus, deadlineStyles, budgetStatusLabels } from '../lib/utils'
 import { productionService } from '../services/production'
 import { ordersService } from '../services/orders'
 
@@ -44,12 +45,23 @@ function KanbanCard({ order, onAdvance, onPause, onResume, onFinish, isAdvancing
           <p className="text-xs text-text-muted">Produto</p>
           <p className="text-sm text-text-secondary truncate">{order.products?.name || '—'} • {order.quantity}un</p>
         </div>
+        {order.budget_status && (
+          <div>
+            <p className="text-xs text-text-muted">Orçamento</p>
+            <Badge variant={
+              order.budget_status === 'approved' ? 'success' :
+              order.budget_status === 'rejected' ? 'danger' : 'warning'
+            } className="text-xs mt-0.5">
+              {budgetStatusLabels[order.budget_status]}
+            </Badge>
+          </div>
+        )}
       </div>
 
       <div className="flex items-center justify-between pt-3 border-t border-border-light">
         <div className="flex items-center gap-2">
           <Avatar name="RS" size="sm" />
-          <span className="text-xs text-text-muted">João</span>
+          <span className="text-xs text-text-muted">{(order.seller?.name || '').split(' ')[0] || '—'}</span>
         </div>
         <div className="flex items-center gap-1.5">
           {deadline !== 'normal' && (
@@ -61,7 +73,6 @@ function KanbanCard({ order, onAdvance, onPause, onResume, onFinish, isAdvancing
         </div>
       </div>
 
-      {/* Actions */}
       <div className="mt-3 flex items-center gap-1">
         <button
           onClick={() => navigate(`/orders/${order.id}`)}
@@ -118,14 +129,15 @@ export function Kanban() {
   const [loading, setLoading] = useState(true)
   const [advancing, setAdvancing] = useState(null)
   const [filterDeadline, setFilterDeadline] = useState('')
+  const [searchTerm, setSearchTerm] = useState('')
   const [draggedOrder, setDraggedOrder] = useState(null)
   const navigate = useNavigate()
 
-  useEffect(() => { loadKanban() }, [])
-
-  const loadKanban = async () => {
+  const loadKanban = useCallback(async () => {
     try {
-      const data = await productionService.getOrdersByStage()
+      const filters = {}
+      if (searchTerm) filters.search = searchTerm
+      const data = await productionService.getOrdersByStage(filters)
       setStages(data)
     } catch (err) {
       console.error(err)
@@ -133,7 +145,9 @@ export function Kanban() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [searchTerm])
+
+  useEffect(() => { loadKanban() }, [loadKanban])
 
   const handleAdvance = async (orderId) => {
     setAdvancing(orderId)
@@ -162,17 +176,6 @@ export function Kanban() {
     try {
       await ordersService.resume(orderId)
       toast.success('OS retomada!')
-      await loadKanban()
-    } catch (err) {
-      toast.error(`Erro: ${err.message}`)
-    }
-  }
-
-  const handleFinish = async (orderId) => {
-    if (!confirm('Finalizar esta OS?')) return
-    try {
-      await ordersService.finish(orderId)
-      toast.success('OS finalizada!')
       await loadKanban()
     } catch (err) {
       toast.error(`Erro: ${err.message}`)
@@ -236,13 +239,23 @@ export function Kanban() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="h-full flex flex-col space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-text-primary">Produção</h1>
           <p className="text-sm text-text-muted mt-1">Kanban de produção — arraste ou avance as ordens entre as fases</p>
         </div>
         <div className="flex items-center gap-3">
+          <div className="relative">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+            <Input
+              type="text"
+              placeholder="Buscar..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 w-48"
+            />
+          </div>
           <div className="flex items-center gap-2 text-sm text-text-muted">
             <Filter size={14} />
             <span>Filtrar:</span>
@@ -268,68 +281,71 @@ export function Kanban() {
         </div>
       </div>
 
-      <div className="flex gap-4 overflow-x-auto pb-4 -mx-6 lg:-mx-8 px-6 lg:px-8">
-        {filteredStages.map(({ stage, orders }) => (
-          <div
-            key={stage.id}
-            className="flex-shrink-0 w-72"
-            onDragOver={onDragOver}
-            onDrop={async (e) => {
-              e.preventDefault()
-              if (!draggedOrder) return
-              if (stage.name === 'Finalizado') {
-                if (!confirm(`Mover ${draggedOrder.order_number} para Finalizado?`)) return
-              }
-              try {
-                await ordersService.moveToStage(draggedOrder.id, stage.name, stage.id)
-                toast.success(`${draggedOrder.order_number} movida para ${stage.name}`)
-                await loadKanban()
-              } catch (err) {
-                toast.error(`Erro: ${err.message}`)
-              }
-              setDraggedOrder(null)
-            }}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <div className={`h-3 w-3 rounded-full ${
-                  stage.name === 'Finalizado' ? 'bg-success' :
-                  stage.name === 'Desenho' ? 'bg-primary' :
-                  stage.name === 'Impressão' ? 'bg-info' :
-                  stage.name === 'Calandra' ? 'bg-warning' :
-                  stage.name === 'Corte' ? 'bg-danger' :
-                  stage.name === 'Costura' ? 'bg-purple-500' : 'bg-gray-500'
-                }`} />
-                <h3 className="text-sm font-semibold text-text-primary">{stage.name}</h3>
-              </div>
-              <span className="inline-flex items-center justify-center h-7 min-w-[28px] rounded-lg bg-gray-100 px-2 text-xs font-medium text-text-secondary">
-                {orders.length}
-              </span>
-            </div>
-            <div className="space-y-3 min-h-[300px]">
-              {orders.length > 0 ? (
-                orders.map((order) => (
-                  <KanbanCard
-                    key={order.id}
-                    order={order}
-                    onAdvance={handleAdvance}
-                    onPause={handlePause}
-                    onResume={handleResume}
-                    onFinish={handleFinish}
-                    isAdvancing={advancing}
-                    onDragStart={onDragStart}
-                    onDragOver={onDragOver}
-                    onDrop={onDrop}
-                  />
-                ))
-              ) : (
-                <div className="flex items-center justify-center h-32 rounded-xl border-2 border-dashed border-border-light">
-                  <p className="text-xs text-text-muted">Nenhuma OS</p>
+      <div className="flex-1 overflow-x-auto overflow-y-auto -mx-6 lg:-mx-8 px-6 lg:px-8 pb-4">
+        <div className="flex gap-4 h-full min-h-[calc(100vh-280px)]">
+          {filteredStages.map(({ stage, orders }) => (
+            <div
+              key={stage.id}
+              className="flex-shrink-0 w-72 flex flex-col"
+              onDragOver={onDragOver}
+              onDrop={async (e) => {
+                e.preventDefault()
+                if (!draggedOrder) return
+                if (stage.name === 'Finalizado') {
+                  if (!confirm(`Mover ${draggedOrder.order_number} para Finalizado?`)) return
+                }
+                try {
+                  await ordersService.moveToStage(draggedOrder.id, stage.name, stage.id)
+                  toast.success(`${draggedOrder.order_number} movida para ${stage.name}`)
+                  await loadKanban()
+                } catch (err) {
+                  toast.error(`Erro: ${err.message}`)
+                }
+                setDraggedOrder(null)
+              }}
+            >
+              <div className="flex items-center justify-between mb-4 shrink-0">
+                <div className="flex items-center gap-2">
+                  <div className={`h-3 w-3 rounded-full ${
+                    stage.name === 'Finalizado' ? 'bg-success' :
+                    stage.name === 'Aprovação de Orçamento' ? 'bg-purple-500' :
+                    stage.name === 'Desenho' ? 'bg-primary' :
+                    stage.name === 'Impressão' ? 'bg-info' :
+                    stage.name === 'Calandra' ? 'bg-warning' :
+                    stage.name === 'Corte' ? 'bg-danger' :
+                    stage.name === 'Costura' ? 'bg-purple-500' : 'bg-gray-500'
+                  }`} />
+                  <h3 className="text-sm font-semibold text-text-primary">{stage.name}</h3>
                 </div>
-              )}
+                <span className="inline-flex items-center justify-center h-7 min-w-[28px] rounded-lg bg-gray-100 px-2 text-xs font-medium text-text-secondary">
+                  {orders.length}
+                </span>
+              </div>
+              <div className="flex-1 space-y-3 overflow-y-auto min-h-[200px] pb-4">
+                {orders.length > 0 ? (
+                  orders.map((order) => (
+                    <KanbanCard
+                      key={order.id}
+                      order={order}
+                      onAdvance={handleAdvance}
+                      onPause={handlePause}
+                      onResume={handleResume}
+                      onFinish={() => {}}
+                      isAdvancing={advancing}
+                      onDragStart={onDragStart}
+                      onDragOver={onDragOver}
+                      onDrop={onDrop}
+                    />
+                  ))
+                ) : (
+                  <div className="flex items-center justify-center h-32 rounded-xl border-2 border-dashed border-border-light">
+                    <p className="text-xs text-text-muted">Nenhuma OS</p>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   )

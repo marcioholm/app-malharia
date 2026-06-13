@@ -14,6 +14,7 @@ import { Reports } from './pages/Reports'
 import { Settings } from './pages/Settings'
 import { CompanySettings } from './pages/CompanySettings'
 import { UsersSettings } from './pages/UsersSettings'
+import { PublicBudget } from './pages/PublicBudget'
 
 export default function App() {
   return (
@@ -35,6 +36,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/orders/:id/print" element={<PrintOS />} />
+        <Route path="/orcamento/:token" element={<PublicBudget />} />
         <Route element={<Layout />}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/clients" element={<Clients />} />

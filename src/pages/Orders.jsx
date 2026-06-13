@@ -1,27 +1,27 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Eye, ClipboardList, DollarSign, User as UserIcon } from 'lucide-react'
+import { Plus, Eye, ClipboardList, DollarSign, User as UserIcon, Search } from 'lucide-react'
 import { Button } from '../components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card'
 import { StatusBadge, PriorityBadge } from '../components/ui/status-badge'
+import { Input } from '../components/ui/input'
 import { Badge } from '../components/ui/badge'
-import { formatDate, formatCurrency, paymentStatusLabels, paymentStatusColors } from '../lib/utils'
+import { formatDate, formatCurrency, paymentStatusLabels, paymentMethodLabels, budgetStatusLabels } from '../lib/utils'
 import { ordersService } from '../services/orders'
 
 export function Orders() {
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('')
+  const [searchTerm, setSearchTerm] = useState('')
+  const [searchTimeout, setSearchTimeout] = useState(null)
   const navigate = useNavigate()
 
-  useEffect(() => {
-    loadOrders()
-  }, [statusFilter])
-
-  const loadOrders = async () => {
+  const loadOrders = useCallback(async () => {
     try {
       const filters = {}
       if (statusFilter) filters.status = statusFilter
+      if (searchTerm) filters.search = searchTerm
       const data = await ordersService.list(filters)
       setOrders(data)
     } catch (err) {
@@ -29,7 +29,16 @@ export function Orders() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [statusFilter, searchTerm])
+
+  useEffect(() => {
+    if (searchTimeout) clearTimeout(searchTimeout)
+    const timeout = setTimeout(() => {
+      loadOrders()
+    }, 300)
+    setSearchTimeout(timeout)
+    return () => clearTimeout(timeout)
+  }, [statusFilter, searchTerm, loadOrders])
 
   const getDeadlineVariant = (deliveryDate) => {
     if (!deliveryDate) return 'default'
@@ -53,8 +62,18 @@ export function Orders() {
 
       <Card>
         <CardContent className="pt-6">
-          <div className="flex flex-wrap items-center gap-3 mb-6">
-            <span className="text-sm font-medium text-text-secondary">Filtros:</span>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
+            <div className="relative flex-1 max-w-md">
+              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted" />
+              <Input
+                type="text"
+                placeholder="Buscar por cliente, OS, produto..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <span className="text-sm font-medium text-text-secondary">Status:</span>
             <div className="flex flex-wrap gap-2">
               {['', 'aberta', 'em_producao', 'finalizada', 'entregue', 'cancelada'].map((s) => (
                 <button
@@ -96,6 +115,7 @@ export function Orders() {
                     <th className="text-left py-3 px-4 text-xs font-medium text-text-muted uppercase tracking-wider">Vendedor</th>
                     <th className="text-left py-3 px-4 text-xs font-medium text-text-muted uppercase tracking-wider">Valor</th>
                     <th className="text-left py-3 px-4 text-xs font-medium text-text-muted uppercase tracking-wider">Financeiro</th>
+                    <th className="text-left py-3 px-4 text-xs font-medium text-text-muted uppercase tracking-wider">Orçamento</th>
                     <th className="text-left py-3 px-4 text-xs font-medium text-text-muted uppercase tracking-wider">Prazo</th>
                     <th className="text-left py-3 px-4 text-xs font-medium text-text-muted uppercase tracking-wider">Fase</th>
                     <th className="text-left py-3 px-4 text-xs font-medium text-text-muted uppercase tracking-wider">Status</th>
@@ -127,6 +147,15 @@ export function Orders() {
                             {paymentStatusLabels[order.payment_status]}
                           </Badge>
                         ) : '—'}
+                      </td>
+                      <td className="py-3 px-4">
+                        <Badge variant={
+                          order.budget_status === 'approved' ? 'success' :
+                          order.budget_status === 'rejected' ? 'danger' : 
+                          order.budget_status === 'pending' ? 'warning' : 'default'
+                        }>
+                          {budgetStatusLabels[order.budget_status] || '—'}
+                        </Badge>
                       </td>
                       <td className="py-3 px-4">
                         <Badge variant={getDeadlineVariant(order.delivery_date)}>
