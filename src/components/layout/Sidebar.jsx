@@ -201,7 +201,7 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }) {
     <>
       <aside
         className={cn(
-          'fixed left-0 top-0 z-40 h-screen bg-sidebar hidden lg:flex flex-col transition-all duration-300',
+          'sticky top-0 left-0 z-40 h-screen bg-sidebar hidden lg:flex flex-col transition-all duration-300 shrink-0',
           collapsed ? 'w-20' : 'w-60'
         )}
       >

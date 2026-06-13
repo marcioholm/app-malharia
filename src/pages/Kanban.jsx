@@ -239,8 +239,8 @@ export function Kanban() {
   }
 
   return (
-    <div className="h-full flex flex-col space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="flex-1 flex flex-col space-y-4 min-h-0">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
         <div>
           <h1 className="text-2xl font-bold text-text-primary">Produção</h1>
           <p className="text-sm text-text-muted mt-1">Kanban de produção — arraste ou avance as ordens entre as fases</p>
@@ -281,12 +281,12 @@ export function Kanban() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-x-auto overflow-y-auto -mx-6 lg:-mx-8 px-6 lg:px-8 pb-4">
-        <div className="flex gap-4 h-full min-h-[calc(100vh-280px)]">
+      <div className="flex-1 overflow-x-auto overflow-y-auto -mx-6 lg:-mx-8 px-6 lg:px-8 pb-4 min-h-0">
+        <div className="flex gap-4 h-full">
           {filteredStages.map(({ stage, orders }) => (
             <div
               key={stage.id}
-              className="flex-shrink-0 w-72 flex flex-col"
+              className="flex-shrink-0 w-72 h-full flex flex-col"
               onDragOver={onDragOver}
               onDrop={async (e) => {
                 e.preventDefault()
@@ -321,7 +321,7 @@ export function Kanban() {
                   {orders.length}
                 </span>
               </div>
-              <div className="flex-1 space-y-3 overflow-y-auto min-h-[200px] pb-4">
+              <div className="flex-1 space-y-3 overflow-y-auto min-h-0 pb-4">
                 {orders.length > 0 ? (
                   orders.map((order) => (
                     <KanbanCard

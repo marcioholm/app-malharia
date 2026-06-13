@@ -70,14 +70,9 @@ export function Layout() {
         onMobileClose={() => setMobileOpen(false)}
         onMobileOpen={() => setMobileOpen(true)}
       />
-      <div
-        className={cn(
-          'flex-1 flex flex-col transition-all duration-300',
-          collapsed ? 'lg:ml-20' : 'lg:ml-60'
-        )}
-      >
+      <div className="flex-1 flex flex-col min-w-0">
         <Header title={title} onMenuClick={() => setMobileOpen(true)} />
-        <main className="flex-1 p-4 lg:p-8 pt-16 lg:pt-8">
+        <main className="flex-1 flex flex-col p-4 lg:p-8 bg-bg-main">
           <Outlet />
         </main>
       </div>
