@@ -212,7 +212,7 @@ export function OrderForm() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6 relative pb-20">
+    <div className="max-w-7xl mx-auto space-y-6 relative">
       <div className="flex items-center gap-4">
         <button
           onClick={() => navigate('/orders')}
@@ -413,12 +413,7 @@ export function OrderForm() {
 
             {/* Items */}
             <div className="border-t border-border pt-6" id="items-section">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base font-semibold text-text-primary">Itens da Produção</h3>
-                <Button type="button" variant="outline" size="sm" onClick={addItem}>
-                  <Plus size={14} /> Adicionar Item
-                </Button>
-              </div>
+              <h3 className="text-base font-semibold text-text-primary mb-4">Itens da Produção</h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -515,6 +510,19 @@ export function OrderForm() {
                       </tr>
                     ))}
                   </tbody>
+                  <tbody>
+                    <tr>
+                      <td colSpan={8} className="py-1">
+                        <button
+                          type="button"
+                          onClick={addItem}
+                          className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border-2 border-dashed border-border text-text-muted hover:border-primary hover:text-primary hover:bg-primary-bg/20 transition-all cursor-pointer text-sm"
+                        >
+                          <Plus size={16} /> Adicionar Item
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
                   <tfoot>
                     <tr className="border-t border-border font-medium">
                       <td colSpan={4} className="py-2 text-sm text-text-primary">Total</td>
@@ -609,15 +617,7 @@ export function OrderForm() {
         </CardContent>
       </Card>
 
-      {/* Floating add button */}
-      <button
-        type="button"
-        onClick={addItem}
-        className="fixed bottom-6 right-6 lg:bottom-8 lg:right-8 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-white shadow-lg hover:bg-primary-dark hover:shadow-xl transition-all z-50 cursor-pointer"
-        title="Adicionar item"
-      >
-        <Plus size={24} />
-      </button>
+
     </div>
   )
 }
