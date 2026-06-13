@@ -102,6 +102,58 @@ export function Header({ title, onMenuClick }) {
               </span>
             )}
           </button>
+
+          {notifOpen && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setNotifOpen(false)} />
+              <div className="absolute right-0 top-full mt-2 z-50 w-80 sm:w-96 rounded-xl border border-border bg-card-bg shadow-xl">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+                  <h3 className="text-sm font-semibold text-text-primary">Notificações</h3>
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={handleMarkAllRead}
+                      className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors cursor-pointer"
+                    >
+                      <CheckCheck size={14} />
+                      Marcar todas como lidas
+                    </button>
+                  )}
+                </div>
+                <div className="max-h-80 overflow-y-auto">
+                  {notifications.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-10 text-text-muted">
+                      <Bell size={24} className="mb-2 opacity-40" />
+                      <p className="text-sm">Nenhuma notificação</p>
+                    </div>
+                  ) : (
+                    notifications.map((notif) => (
+                      <button
+                        key={notif.id}
+                        onClick={() => {
+                          handleMarkRead(notif.id)
+                          if (notif.link) navigate(notif.link)
+                          setNotifOpen(false)
+                        }}
+                        className={`w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-border/50 last:border-none cursor-pointer ${!notif.read ? 'bg-primary/5' : ''}`}
+                      >
+                        <span className="mt-0.5 text-base flex-shrink-0">{typeIcons[notif.type] || typeIcons.info}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm ${!notif.read ? 'font-semibold text-text-primary' : 'text-text-secondary'}`}>
+                            {notif.title}
+                          </p>
+                          <p className="text-xs text-text-muted mt-0.5 line-clamp-2">{notif.message}</p>
+                          <p className="text-[11px] text-text-muted/60 mt-1">{formatDate(notif.created_at)}</p>
+                        </div>
+                        {!notif.read && (
+                          <span className="mt-1.5 h-2 w-2 rounded-full bg-primary flex-shrink-0" />
+                        )}
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         <DropdownMenu>
