@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Save, Plus, Trash2, UserPlus, ImageUp, X } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Trash2, UserPlus, ImageUp, X, Copy } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
@@ -40,7 +40,7 @@ export function OrderForm() {
     financial_notes: '',
     commission_percentage: 0,
   })
-  const [items, setItems] = useState([{ model: '', custom_name: '', size: '', quantity: 1, unit_price: 0, notes: '' }])
+  const [items, setItems] = useState([{ model: '', custom_name: '', item_number: '', size: '', quantity: 1, unit_price: 0, notes: '' }])
   const [imageFiles, setImageFiles] = useState([])
   const [imagePreviews, setImagePreviews] = useState([])
 
@@ -105,12 +105,18 @@ export function OrderForm() {
   }
 
   const addItem = () => {
-    setItems([...items, { model: '', custom_name: '', size: '', quantity: 1, unit_price: 0, notes: '' }])
+    setItems([...items, { model: '', custom_name: '', item_number: '', size: '', quantity: 1, unit_price: 0, notes: '' }])
   }
 
   const removeItem = (i) => {
     if (items.length <= 1) return
     setItems(items.filter((_, idx) => idx !== i))
+  }
+
+  const duplicateItem = (i) => {
+    const newItems = [...items]
+    newItems.splice(i + 1, 0, { ...items[i] })
+    setItems(newItems)
   }
 
   const updateItem = (i, field, value) => {
@@ -418,12 +424,13 @@ export function OrderForm() {
                   <thead>
                     <tr className="border-b border-border text-xs text-text-muted uppercase tracking-wider">
                       <th className="text-left py-2 pr-2">Modelo</th>
-                      <th className="text-left py-2 px-2">Nome Personalizado</th>
+                      <th className="text-left py-2 px-2">Nome</th>
+                      <th className="text-center py-2 px-2 w-16">Nº</th>
                       <th className="text-center py-2 px-2 w-16">Tam</th>
                       <th className="text-center py-2 px-2 w-20">Qtd</th>
                       <th className="text-right py-2 px-2 w-24">Valor Unit.</th>
-                      <th className="text-right py-2 px-2 w-24">Valor Total</th>
-                      <th className="w-8 py-2 pl-2" />
+                      <th className="text-right py-2 px-2 w-24">V. Total</th>
+                      <th className="w-24 py-2 pl-2" />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border-light">
@@ -442,7 +449,16 @@ export function OrderForm() {
                             type="text"
                             value={item.custom_name}
                             onChange={(e) => updateItem(i, 'custom_name', e.target.value)}
-                            placeholder="Nome (opcional)"
+                            placeholder="Nome"
+                          />
+                        </td>
+                        <td className="py-2 px-2">
+                          <Input
+                            type="text"
+                            value={item.item_number}
+                            onChange={(e) => updateItem(i, 'item_number', e.target.value)}
+                            placeholder="Nº"
+                            className="text-center"
                           />
                         </td>
                         <td className="py-2 px-2">
@@ -450,7 +466,7 @@ export function OrderForm() {
                             type="text"
                             value={item.size}
                             onChange={(e) => updateItem(i, 'size', e.target.value)}
-                            placeholder="Ex: M"
+                            placeholder="Tam"
                             className="text-center"
                           />
                         </td>
@@ -473,25 +489,35 @@ export function OrderForm() {
                             className="text-right"
                           />
                         </td>
-                        <td className="py-2 px-2 text-right font-medium">
+                        <td className="py-2 px-2 text-right font-medium text-xs">
                           {formatCurrency((Number(item.quantity) || 0) * (Number(item.unit_price) || 0))}
                         </td>
                         <td className="py-2 pl-2">
-                          <button
-                            type="button"
-                            onClick={() => removeItem(i)}
-                            className="text-danger hover:text-danger/80 cursor-pointer disabled:opacity-30"
-                            disabled={items.length <= 1}
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => duplicateItem(i)}
+                              className="text-primary hover:text-primary/80 cursor-pointer"
+                              title="Duplicar item"
+                            >
+                              <Copy size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removeItem(i)}
+                              className="text-danger hover:text-danger/80 cursor-pointer disabled:opacity-30"
+                              disabled={items.length <= 1}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot>
                     <tr className="border-t border-border font-medium">
-                      <td colSpan={3} className="py-2 text-sm text-text-primary">Total</td>
+                      <td colSpan={4} className="py-2 text-sm text-text-primary">Total</td>
                       <td className="py-2 text-center text-sm">{totalQty}</td>
                       <td />
                       <td className="py-2 text-right text-sm font-bold">{formatCurrency(totalPrice)}</td>

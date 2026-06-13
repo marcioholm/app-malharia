@@ -174,6 +174,7 @@ export function PublicBudget() {
                   <tr className="border-b border-gray-200 text-xs text-gray-500 uppercase">
                     <th className="text-left py-2 pr-2">Modelo</th>
                     <th className="text-left py-2 px-2">Nome</th>
+                    <th className="text-center py-2 px-2">Nº</th>
                     <th className="text-center py-2 px-2">Tam</th>
                     <th className="text-center py-2 px-2">Qtd</th>
                     <th className="text-right py-2 px-2">Valor Unit.</th>
@@ -185,6 +186,7 @@ export function PublicBudget() {
                     <tr key={i}>
                       <td className="py-2 pr-2 font-medium text-gray-900">{item.model}</td>
                       <td className="py-2 px-2 text-gray-600">{item.custom_name || '—'}</td>
+                      <td className="py-2 px-2 text-center text-gray-600">{item.item_number || '—'}</td>
                       <td className="py-2 px-2 text-center text-gray-600">{item.size || '—'}</td>
                       <td className="py-2 px-2 text-center font-medium">{item.quantity}</td>
                       <td className="py-2 px-2 text-right text-gray-600">{formatCurrency(item.unit_price)}</td>
@@ -194,7 +196,7 @@ export function PublicBudget() {
                 </tbody>
                 <tfoot>
                   <tr className="border-t border-gray-200 font-bold">
-                    <td colSpan={3} className="py-2 text-gray-900">Total</td>
+                    <td colSpan={4} className="py-2 text-gray-900">Total</td>
                     <td className="py-2 text-center">{totalItems}</td>
                     <td />
                     <td className="py-2 text-right">{formatCurrency(totalPrice)}</td>

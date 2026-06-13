@@ -340,7 +340,8 @@ function PrintOS() {
                 <tr className="bg-gray-100 text-xs">
                   <th className="border border-gray-300 p-2 text-center w-8">Nº</th>
                   <th className="border border-gray-300 p-2">Modelo</th>
-                  <th className="border border-gray-300 p-2">Nome Personalizado</th>
+                  <th className="border border-gray-300 p-2">Nome</th>
+                  <th className="border border-gray-300 p-2 text-center w-10">Núm</th>
                   <th className="border border-gray-300 p-2 text-center w-14">Tam</th>
                   <th className="border border-gray-300 p-2 text-center w-14">Qtd</th>
                   <th className="border border-gray-300 p-2 text-right w-20">Valor Unit.</th>
@@ -348,21 +349,22 @@ function PrintOS() {
                 </tr>
               </thead>
               <tbody>
-                {items.length > 0 ? items.map((item, i) => (
+                  {items.length > 0 ? items.map((item, i) => (
                   <tr key={item.id} className="text-xs">
                     <td className="border border-gray-300 p-2 text-center">{String(i + 1).padStart(3, '0')}</td>
                     <td className="border border-gray-300 p-2">{item.model}</td>
                     <td className="border border-gray-300 p-2">{item.custom_name || '—'}</td>
+                    <td className="border border-gray-300 p-2 text-center">{item.item_number || '—'}</td>
                     <td className="border border-gray-300 p-2 text-center">{item.size || '—'}</td>
                     <td className="border border-gray-300 p-2 text-center font-medium">{item.quantity}</td>
                     <td className="border border-gray-300 p-2 text-right">{formatCurrency(item.unit_price)}</td>
                     <td className="border border-gray-300 p-2 text-right font-medium">{formatCurrency(item.total_price)}</td>
                   </tr>
-                )) : (
+                  )) : (
                   <tr>
-                    <td colSpan={7} className="border border-gray-300 p-4 text-center text-xs text-gray-400">Nenhum item cadastrado</td>
+                    <td colSpan={8} className="border border-gray-300 p-4 text-center text-xs text-gray-400">Nenhum item cadastrado</td>
                   </tr>
-                )}
+                  )}
               </tbody>
             </table>
           </div>

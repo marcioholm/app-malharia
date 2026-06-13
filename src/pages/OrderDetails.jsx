@@ -736,6 +736,7 @@ export function OrderDetails() {
                         <tr className="border-b border-border text-xs text-text-muted uppercase tracking-wider">
                           <th className="text-left py-2">Modelo</th>
                           <th className="text-left py-2">Nome</th>
+                          <th className="text-center py-2">Nº</th>
                           <th className="text-center py-2">Tam</th>
                           <th className="text-center py-2">Qtd</th>
                           <th className="text-right py-2">Valor Unit.</th>
@@ -747,6 +748,7 @@ export function OrderDetails() {
                           <tr key={item.id}>
                             <td className="py-2 text-text-primary">{item.model}</td>
                             <td className="py-2 text-text-secondary">{item.custom_name || '—'}</td>
+                            <td className="py-2 text-center text-text-secondary">{item.item_number || '—'}</td>
                             <td className="py-2 text-center text-text-secondary">{item.size || '—'}</td>
                             <td className="py-2 text-center font-medium">{item.quantity}</td>
                             <td className="py-2 text-right text-text-secondary">{formatCurrency(item.unit_price)}</td>
@@ -756,7 +758,7 @@ export function OrderDetails() {
                       </tbody>
                       <tfoot>
                         <tr className="border-t border-border font-bold">
-                          <td colSpan={3} className="py-2 text-text-primary">Total</td>
+                          <td colSpan={4} className="py-2 text-text-primary">Total</td>
                           <td className="py-2 text-center">{totalItems}</td>
                           <td />
                           <td className="py-2 text-right">{formatCurrency(totalValue)}</td>
